@@ -28,6 +28,9 @@
 - Use feature branches with the `codex/` prefix for Codex changes.
 - Keep changes narrowly scoped and aligned with upstream Dire Wolf conventions.
 - Prefer small, reviewable patches over broad rewrites.
+- Before planning organization-spanning workflow, security-control, package, project, or governance changes, review the central SoloSentry lessons register in `SoloSentryOrg/github-enterprise-management-solosentry` at `docs/lessons-learned/register.md`.
+- For organization-spanning changes, carry applicable lessons into the plan and include a short `complexity removed or justified` statement.
+- Stop repeated same-cluster fix-forward until root cause is recorded in the relevant issue, PR, or central lessons register.
 - Do not commit generated build trees, local configuration containing station
   details, audio captures, packet logs, credentials, API tokens, registry
   caches, or temporary tool state.
