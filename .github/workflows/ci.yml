@@ -8,11 +8,10 @@ on:
         description: 'Custom CMAKE flags'
         required: false
   push:
-    paths-ignore:
-      - '.github/**'
   pull_request:
-    paths-ignore:
-      - '.github/**'
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -80,9 +79,10 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # tag: v3
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # tag: v5
         with:
           fetch-depth: 8
+          persist-credentials: false
       - name: dependency
         shell: bash
         run: |
@@ -96,7 +96,7 @@ jobs:
             brew install portaudio hamlib gpsd hidapi
           elif [ "$RUNNER_OS" == "Windows" ]; then
             # add the folder to PATH
-            echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
+            printf '%s\n' 'C:\msys64\mingw32\bin' >> "$GITHUB_PATH"
           fi
       - name: create build environment
         run: |
@@ -104,40 +104,55 @@ jobs:
       - name: configure
         shell: bash
         working-directory: ${{github.workspace}}/build
+        env:
+          CMAKE_FLAGS: ${{ inputs.cmake_flags }}
+          MATRIX_AR: ${{ matrix.config.ar }}
+          MATRIX_CC: ${{ matrix.config.cc }}
+          MATRIX_CXX: ${{ matrix.config.cxx }}
+          MATRIX_WINDRES: ${{ matrix.config.windres }}
+          MATRIX_BUILD_TYPE: ${{ matrix.config.build_type }}
+          MATRIX_EXTRA_FLAGS: ${{ matrix.config.cmake_extra_flags }}
         run: |
+          read -r -a cmake_flags <<< "${CMAKE_FLAGS:-}"
+          read -r -a matrix_extra_flags <<< "${MATRIX_EXTRA_FLAGS:-}"
           if [ "$RUNNER_OS" == "Windows" ]; then
-            export CC=${{ matrix.config.cc }}
-            export CXX=${{ matrix.config.cxx }}
-            export AR=${{ matrix.config.ar }}
-            export WINDRES=${{ matrix.config.windres }}
+            export CC="$MATRIX_CC"
+            export CXX="$MATRIX_CXX"
+            export AR="$MATRIX_AR"
+            export WINDRES="$MATRIX_WINDRES"
           fi
-          cmake $GITHUB_WORKSPACE \
-            -DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }} \
-            -DCMAKE_C_COMPILER=${{ matrix.config.cc }} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} \
+          cmake "$GITHUB_WORKSPACE" \
+            -DCMAKE_BUILD_TYPE="$MATRIX_BUILD_TYPE" \
+            -DCMAKE_C_COMPILER="$MATRIX_CC" \
+            -DCMAKE_CXX_COMPILER="$MATRIX_CXX" \
             -DCMAKE_CXX_FLAGS="-Werror" -DUNITTEST=1 \
-            ${{ matrix.config.cmake_extra_flags }} \
-            ${{ github.event.inputs.cmake_flags }}
+            "${matrix_extra_flags[@]}" \
+            "${cmake_flags[@]}"
       - name: build
         shell: bash
         working-directory: ${{github.workspace}}/build
+        env:
+          MATRIX_AR: ${{ matrix.config.ar }}
+          MATRIX_CC: ${{ matrix.config.cc }}
+          MATRIX_CXX: ${{ matrix.config.cxx }}
+          MATRIX_WINDRES: ${{ matrix.config.windres }}
+          MATRIX_BUILD_TYPE: ${{ matrix.config.build_type }}
         run: |
           if [ "$RUNNER_OS" == "Windows" ]; then
-            export CC=${{ matrix.config.cc }}
-            export CXX=${{ matrix.config.cxx }}
-            export AR=${{ matrix.config.ar }}
-            export WINDRES=${{ matrix.config.windres }}
+            export CC="$MATRIX_CC"
+            export CXX="$MATRIX_CXX"
+            export AR="$MATRIX_AR"
+            export WINDRES="$MATRIX_WINDRES"
           fi
-          cmake --build . --config ${{ matrix.config.build_type }} \
-            ${{ github.event.inputs.cmake_flags }}
+          cmake --build . --config "$MATRIX_BUILD_TYPE"
       - name: test
-        continue-on-error: true
         shell: bash
         working-directory: ${{github.workspace}}/build
+        env:
+          MATRIX_BUILD_TYPE: ${{ matrix.config.build_type }}
         run: |
-          ctest -C ${{ matrix.config.build_type }} \
-            --parallel 2 --output-on-failure \
-            ${{ github.event.inputs.cmake_flags }}
+          ctest -C "$MATRIX_BUILD_TYPE" \
+            --parallel 2 --output-on-failure
       - name: package
         shell: bash
         working-directory: ${{github.workspace}}/build

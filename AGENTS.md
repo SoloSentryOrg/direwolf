@@ -39,6 +39,11 @@
 - Before changing build, packaging, or release behavior, inspect the existing
   CMake, package, and GitHub Actions flow and preserve supported platforms
   unless the user explicitly approves a support change.
+- CodeQL uses the organization-managed GitHub default setup; checked-in
+  advanced CodeQL workflows are intentionally absent.
+- Before proposing advanced CodeQL setup, reconcile the live default-setup
+  state, required checks or rulesets, and observed status-check names, then
+  retain exactly one active CodeQL setup.
 
 ## Sub-Agent Use
 
