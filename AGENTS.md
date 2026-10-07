@@ -34,8 +34,24 @@
 - Do not commit generated build trees, local configuration containing station
   details, audio captures, packet logs, credentials, API tokens, registry
   caches, or temporary tool state.
-- Prefer `scripts/verify.sh` for local verification before commit, push, or
-  release work.
+- Use the checked-in `.github/workflows/ci.yml` configure, build, and CTest
+  steps as the local verification reference. After installing the dependencies
+  for the target platform, run from the repository root:
+  ```sh
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DUNITTEST=1
+  cmake --build build --config Debug
+  ctest --test-dir build -C Debug --parallel 2 --output-on-failure
+  ```
+  Preserve the workflow's target compiler and generator settings for Windows
+  and cross-platform checks. Record unavailable prerequisites and failed steps;
+  do not report local verification as passed without reading the results.
+- The default branch has no `scripts/verify.sh` or checked-in
+  `security-gate.yml`. Historical workflow registry entries or earlier PR
+  revisions do not prove current security coverage. Reconcile source, exact
+  checkout, live configuration, and current PR checks before proposing a
+  required context. Keep required-check adoption and branch protection under
+  the separately reviewed central governance issue
+  `SoloSentryOrg/github-enterprise-management-solosentry#112`.
 - Before changing build, packaging, or release behavior, inspect the existing
   CMake, package, and GitHub Actions flow and preserve supported platforms
   unless the user explicitly approves a support change.
