@@ -6,6 +6,12 @@ set(CUSTOM_TEST_BINARY_DIR "${CMAKE_BINARY_DIR}/test")
 add_executable(log_csv_record_test log_csv_record_test.c)
 target_include_directories(log_csv_record_test PRIVATE ${CUSTOM_SRC_DIR})
 add_test(log-csv-record "${CUSTOM_TEST_BINARY_DIR}/log_csv_record_test${CMAKE_EXECUTABLE_SUFFIX}")
+add_executable(log_csv_writer_test
+  log_csv_writer_test.c
+  ${CUSTOM_SRC_DIR}/log.c
+  ${CUSTOM_SRC_DIR}/textcolor.c)
+target_include_directories(log_csv_writer_test PRIVATE ${CUSTOM_SRC_DIR})
+add_test(NAME log-csv-writer COMMAND "${CUSTOM_TEST_BINARY_DIR}/log_csv_writer_test${CMAKE_EXECUTABLE_SUFFIX}")
 add_test(NAME log2gpx-record COMMAND ${CMAKE_COMMAND}
   -DLOG2GPX=$<TARGET_FILE:log2gpx>
   -DTEST_DIR=${CUSTOM_TEST_BINARY_DIR}
