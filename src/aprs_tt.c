@@ -1353,7 +1353,7 @@ static int parse_location (char *e)
 	        char message[300];
 
 		text_color_set(DW_COLOR_ERROR);
-	        utm_error_string (lerr, message);
+	        utm_error_string (lerr, message, sizeof(message));
                 dw_printf ("Conversion from UTM failed:\n%s\n\n", message);
               }
 
@@ -1406,7 +1406,7 @@ static int parse_location (char *e)
 	        char message[300];
 
 		text_color_set(DW_COLOR_ERROR);
-	        mgrs_error_string (lerr, message);
+	        mgrs_error_string (lerr, message, sizeof(message));
                 dw_printf ("Conversion from MGRS/USNG failed:\n%s\n\n", message);
               }
 

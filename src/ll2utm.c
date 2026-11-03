@@ -47,7 +47,7 @@ int main (int argc, char *argv[])
 	  printf ("UTM zone = %ld, hemisphere = %c, easting = %.0f, northing = %.0f\n", lzone, hemisphere, easting, northing);
 	}
 	else {
-	  utm_error_string (err, message);
+	  utm_error_string (err, message, sizeof(message));
 	  fprintf (stderr, "Conversion to UTM failed:\n%s\n\n", message);
 	
 	  // Others could still succeed, keep going.
@@ -71,7 +71,7 @@ int main (int argc, char *argv[])
 	  printf ("\n");
 	}
 	else {
-	  mgrs_error_string (err, message);
+	  mgrs_error_string (err, message, sizeof(message));
 	  fprintf (stderr, "Conversion to MGRS failed:\n%s\n", message);
 	}
 
@@ -90,7 +90,7 @@ int main (int argc, char *argv[])
 	  printf ("\n");
 	}
 	else {
-	  usng_error_string (err, message);
+	  usng_error_string (err, message, sizeof(message));
 	  fprintf (stderr, "Conversion to USNG failed:\n%s\n", message);
 	}
 

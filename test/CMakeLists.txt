@@ -492,6 +492,11 @@ add_test(lltest lltest)
 add_test(enctest enctest)
 add_test(kisstest kisstest)
 add_test(pad2test pad2test)
+add_executable(geotranz_error_string_test
+  ${CUSTOM_TEST_DIR}/geotranz_error_string_test.c
+  ${CUSTOM_GEOTRANZ_DIR}/error_string.c
+  )
+add_test(geotranz_error_string_test geotranz_error_string_test)
 add_test(xidtest xidtest)
 add_test(dtmftest dtmftest)
 

@@ -1,6 +1,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "utm.h"
 #include "mgrs.h"
@@ -11,13 +12,14 @@
 
 // Convert error codes to text.
 // Note that the code is a bit mask so it is possible to have multiple messages.
-// Caller should probably provide space for a couple hundred characters to be safe.
+// Caller supplies the output capacity, including the terminating NUL.
 
-
-static const struct {
+struct error_entry {
 	long mask;
-	char *msg;
-} utm_err [] = {
+	const char *msg;
+};
+
+static const struct error_entry utm_err [] = {
 	
 	{ UTM_NO_ERROR,           "No errors occurred in function" },
 	{ UTM_LAT_ERROR,          "Latitude outside of valid range (-80.5 to 84.5 degrees)" },
@@ -32,10 +34,7 @@ static const struct {
 	{ 0, NULL } };
 
 
-static const struct {
-	long mask;
-	char *msg;
-} mgrs_err [] = {
+static const struct error_entry mgrs_err [] = {
 	
 	{ MGRS_NO_ERROR,          "No errors occurred in function" },
 	{ MGRS_LAT_ERROR,         "Latitude outside of valid range (-90 to 90 degrees)" },
@@ -52,10 +51,7 @@ static const struct {
 	{ 0, NULL } };
 
 
-static const struct {
-	long mask;
-	char *msg;
-} usng_err [] = {
+static const struct error_entry usng_err [] = {
 	
 	{ USNG_NO_ERROR,          "No errors occurred in function" },
 	{ USNG_LAT_ERROR,         "Latitude outside of valid range (-90 to 90 degrees)" },
@@ -73,59 +69,47 @@ static const struct {
 
 
 
-void utm_error_string (long err, char *str)
+static void format_errors (const struct error_entry *entries, long err, char *str, size_t str_size)
 {
 	int n;
+	size_t used = 0;
+	int found = 0;
 
-	strcpy (str, "");
+	if (str_size == 0) return;
+	str[0] = '\0';
 
-	for (n = 1; utm_err[n].mask != 0; n++) {
-	  if (err & utm_err[n].mask) {
-	    if (strlen(str) > 0) strcat(str, "\n");
-	    strcat (str, utm_err[n].msg);
+	for (n = 1; entries[n].mask != 0; n++) {
+	  if (err & entries[n].mask) {
+	    int written;
+	    size_t remaining = str_size - used;
+	    found = 1;
+	    written = snprintf (str + used, remaining, "%s%s", used ? "\n" : "", entries[n].msg);
+	    if (written < 0 || (size_t)written >= remaining) {
+	      str[str_size - 1] = '\0';
+	      return;
+	    }
+	    used += (size_t)written;
 	  }
 	}
 
-	if (strlen(str) == 0) {
-	  strcpy (str, utm_err[0].msg);
+	if (!found) {
+	  snprintf (str, str_size, "%s", entries[0].msg);
 	}
 }
 
-void mgrs_error_string (long err, char *str)
+void utm_error_string (long err, char *str, size_t str_size)
 {
-	int n;
-
-	strcpy (str, "");
-
-	for (n = 1; mgrs_err[n].mask != 0; n++) {
-	  if (err & mgrs_err[n].mask) {
-	    if (strlen(str) > 0) strcat(str, "\n");
-	    strcat (str, mgrs_err[n].msg);
-	  }
-	}
-
-	if (strlen(str) == 0) {
-	  strcpy (str, mgrs_err[0].msg);
-	}
+	format_errors (utm_err, err, str, str_size);
 }
 
-
-void usng_error_string (long err, char *str)
+void mgrs_error_string (long err, char *str, size_t str_size)
 {
-	int n;
+	format_errors (mgrs_err, err, str, str_size);
+}
 
-	strcpy (str, "");
-
-	for (n = 1; usng_err[n].mask != 0; n++) {
-	  if (err & usng_err[n].mask) {
-	    if (strlen(str) > 0) strcat(str, "\n");
-	    strcat (str, usng_err[n].msg);
-	  }
-	}
-
-	if (strlen(str) == 0) {
-	  strcpy (str, usng_err[0].msg);
-	}
+void usng_error_string (long err, char *str, size_t str_size)
+{
+	format_errors (usng_err, err, str, str_size);
 }
 
 
