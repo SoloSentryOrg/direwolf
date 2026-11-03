@@ -922,9 +922,19 @@ void server_send_monitored (int chan, packet_t pp, int own_xmit)
 	    // Timestamp with [...]\r
 
 	    time_t clock = time(NULL);
-	    struct tm *tm = localtime(&clock);		// TODO: use localtime_r ?
+	    struct tm local_tm;
+#if __WIN32__
+	    int time_ok = localtime_s(&local_tm, &clock) == 0;
+#else
+	    int time_ok = localtime_r(&clock, &local_tm) != NULL;
+#endif
+	    if (!time_ok) {
+	      text_color_set(DW_COLOR_ERROR);
+	      dw_printf("Could not convert AGW monitor timestamp to local time.\n");
+	      return;
+	    }
 	    char ts[32];
-	    snprintf (ts, sizeof(ts), "[%02d:%02d:%02d]\r", tm->tm_hour, tm->tm_min, tm->tm_sec);
+	    snprintf (ts, sizeof(ts), "[%02d:%02d:%02d]\r", local_tm.tm_hour, local_tm.tm_min, local_tm.tm_sec);
 	    strlcat ((char*)(agwpe_msg.data), ts, sizeof(agwpe_msg.data));
 
 	    // Information if any with \r.
