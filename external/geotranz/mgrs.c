@@ -510,13 +510,17 @@ long Break_MGRS_String (char* MGRS,
     {
       strncpy (east_string, MGRS+j, n);
       east_string[n] = 0;
-      sscanf (east_string, "%ld", &east);
       strncpy (north_string, MGRS+j+n, n);
       north_string[n] = 0;
-      sscanf (north_string, "%ld", &north);
-      multiplier = pow (10.0, 5 - n);
-      *Easting = east * multiplier;
-      *Northing = north * multiplier;
+      if ((sscanf (east_string, "%ld", &east) != 1) ||
+          (sscanf (north_string, "%ld", &north) != 1))
+        error_code |= MGRS_STRING_ERROR;
+      else
+      {
+        multiplier = pow (10.0, 5 - n);
+        *Easting = east * multiplier;
+        *Northing = north * multiplier;
+      }
     }
     else
     {
