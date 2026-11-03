@@ -184,7 +184,7 @@ int main (int argc, char *argv[])
 	    chan = mon_cmd.portx;
 	    memset (&alevel, 0, sizeof(alevel));
 	    pp = ax25_from_frame ((unsigned char *)(data+1), mon_cmd.data_len-1, alevel);
-	    ax25_format_addrs (pp, result);
+	    ax25_format_addrs (pp, result, sizeof(result));
 	    info_len = ax25_get_info (pp, (unsigned char **)(&pinfo));
 	    pinfo[info_len] = '\0';
 	    strlcat (result, pinfo, sizeof(result));

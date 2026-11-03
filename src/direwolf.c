@@ -1245,7 +1245,7 @@ void app_process_rec_packet (int chan, int subchan, int slice, packet_t pp, alev
 	    break;
 	}
 
-	ax25_format_addrs (pp, stemp);
+	ax25_format_addrs (pp, stemp, sizeof(stemp));
 
 	info_len = ax25_get_info (pp, &pinfo);
 

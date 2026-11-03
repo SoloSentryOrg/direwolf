@@ -9,6 +9,8 @@
 #ifndef AX25_PAD_H
 #define AX25_PAD_H 1
 
+#include <stddef.h>
+
 
 #define AX25_MAX_REPEATERS 8
 #define AX25_MIN_ADDRS 2	/* Destination & Source. */
@@ -414,7 +416,7 @@ extern double ax25_get_release_time (packet_t this_p);
 extern void ax25_set_modulo (packet_t this_p, int modulo);
 extern int ax25_get_modulo (packet_t this_p);
 
-extern void ax25_format_addrs (packet_t pp, char *);
+extern void ax25_format_addrs (packet_t pp, char *, size_t);
 extern void ax25_format_via_path (packet_t this_p, char *result, size_t result_size);
 
 extern int ax25_pack (packet_t pp, unsigned char result[AX25_MAX_PACKET_LEN]);

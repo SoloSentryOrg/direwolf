@@ -5217,7 +5217,7 @@ int main (int argc, char *argv[])
 	        ax25_hex_dump (pp);
 	        dw_printf ("-------------------\n");
 
-	        ax25_format_addrs (pp, addrs);
+	        ax25_format_addrs (pp, addrs, sizeof(addrs));
 	        text_color_set(DW_COLOR_DECODED);
 	        dw_printf ("%s", addrs);
 
