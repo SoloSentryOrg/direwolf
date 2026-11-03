@@ -797,7 +797,7 @@ void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct 
 	        snprintf (prefix, sizeof(prefix), "[%d]", chan);
 	      }
 
-	      ax25_format_addrs (pp, addrs);
+	      ax25_format_addrs (pp, addrs, sizeof(addrs));
 
 	      info_len = ax25_get_info (pp, &pinfo);
 

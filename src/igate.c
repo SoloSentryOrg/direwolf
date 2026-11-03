@@ -1465,7 +1465,7 @@ static void send_packet_to_server (packet_t pp, int chan)
  *		IGate that only gates to RF messages for stations heard directly.
  */
 
-	ax25_format_addrs (pp, msg);
+	ax25_format_addrs (pp, msg, sizeof(msg));
 	msg[strlen(msg)-1] = '\0';    /* Remove trailing ":" */
 
 	if (save_igate_config_p->tx_chan >= 0) {

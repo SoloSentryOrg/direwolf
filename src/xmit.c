@@ -629,7 +629,7 @@ static void * xmit_thread (void *arg)
 	        text_color_set(DW_COLOR_ERROR);
 		dw_printf ("Waited too long for clear channel.  Discarding packet below.\n");
 
-	        ax25_format_addrs (pp, stemp);
+	        ax25_format_addrs (pp, stemp, sizeof(stemp));
 
 	        info_len = ax25_get_info (pp, &pinfo);
 
@@ -1002,7 +1002,7 @@ static int send_one_frame (int c, int p, packet_t pp)
 	  strlcpy (ts, "", sizeof(ts));
 	}
 
-	ax25_format_addrs (pp, stemp);
+	ax25_format_addrs (pp, stemp, sizeof(stemp));
 	info_len = ax25_get_info (pp, &pinfo);
 	text_color_set(DW_COLOR_XMIT);
 #if 0						// FIXME - enable this?

@@ -276,7 +276,7 @@ void tq_append (int chan, int prio, packet_t pp)
 	  }
 
 	  char stemp[256];	// Formated addresses.
-	  ax25_format_addrs (pp, stemp);
+	  ax25_format_addrs (pp, stemp, sizeof(stemp));
 	  unsigned char *pinfo;
 	  int info_len = ax25_get_info (pp, &pinfo);
 	  text_color_set(DW_COLOR_XMIT);

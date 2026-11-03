@@ -788,6 +788,25 @@ int main ()
 	int info_len = 0;
 	packet_t pp;
 
+	/* A received address path must not write beyond the caller's buffer. */
+	{
+	  struct {
+	    char output[8];
+	    char guard[4];
+	  } bounded;
+	  char complete[128];
+	  packet_t received = ax25_from_text ("N0CALL>APRS,WIDE1-1,WIDE2-2:hello", 1);
+
+	  assert (received != NULL);
+	  memset (&bounded, 'G', sizeof(bounded));
+	  ax25_format_addrs (received, bounded.output, sizeof(bounded.output));
+	  assert (bounded.output[sizeof(bounded.output) - 1] == 0);
+	  assert (memcmp (bounded.guard, "GGGG", sizeof(bounded.guard)) == 0);
+	  ax25_format_addrs (received, complete, sizeof(complete));
+	  assert (strcmp (complete, "N0CALL>APRS,WIDE1-1,WIDE2-2:") == 0);
+	  ax25_delete (received);
+	}
+
 	strcpy (addrs[0], "W2UB");
 	strcpy (addrs[1], "WB2OSZ-15");
 	num_addr = 2;

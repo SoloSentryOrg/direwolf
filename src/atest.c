@@ -771,7 +771,7 @@ void dlq_rec_frame (int chan, int subchan, int slice, packet_t pp, alevel_t alev
 	packets_decoded_one++;
 	if ( ! hdlc_rec_data_detect_any(chan)) dcd_missing_errors++;
 
-	ax25_format_addrs (pp, stemp);
+	ax25_format_addrs (pp, stemp, sizeof(stemp));
 
 	info_len = ax25_get_info (pp, &pinfo);
 

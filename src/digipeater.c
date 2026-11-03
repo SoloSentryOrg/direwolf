@@ -704,7 +704,7 @@ static void test (char *in, char *out)
 	pp = ax25_from_text (in, 1);
 	assert (pp != NULL);
 
-	ax25_format_addrs (pp, rec);
+	ax25_format_addrs (pp, rec, sizeof(rec));
 	info_len = ax25_get_info (pp, &pinfo);
 	(void)info_len;
 	strlcat (rec, (char*)pinfo, sizeof(rec));
@@ -728,7 +728,7 @@ static void test (char *in, char *out)
 
 	pp = ax25_from_frame (frame, frame_len, alevel);
 	assert (pp != NULL);
-	ax25_format_addrs (pp, rec);
+	ax25_format_addrs (pp, rec, sizeof(rec));
 	info_len = ax25_get_info (pp, &pinfo);
 	strlcat (rec, (char*)pinfo, sizeof(rec));
 
@@ -751,7 +751,7 @@ static void test (char *in, char *out)
 	if (result != NULL) {
 
 	  dedupe_remember (result, 0);
-	  ax25_format_addrs (result, xmit);
+	  ax25_format_addrs (result, xmit, sizeof(xmit));
 	  info_len = ax25_get_info (result, &pinfo);
 	  strlcat (xmit, (char*)pinfo, sizeof(xmit));
 	  ax25_delete (result);
