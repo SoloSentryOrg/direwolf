@@ -83,8 +83,14 @@ static void dw_csv_utf8_append(char *dest, size_t capacity, const char *source)
 static int csv_number(const char *text, double *value)
 {
 	char *end;
+	const unsigned char *p;
 	double parsed;
 	if (text == NULL || *text == '\0') return 0;
+	/* The build uses -ffast-math, so reject NaN/Inf lexically before strtod. */
+	for (p = (const unsigned char *)text; *p != '\0'; p++) {
+	  if (!(*p >= '0' && *p <= '9') && *p != '+' && *p != '-' &&
+	      *p != '.' && *p != 'e' && *p != 'E') return 0;
+	}
 	errno = 0;
 	parsed = strtod(text, &end);
 	if (end == text || *end != '\0' || errno == ERANGE ||

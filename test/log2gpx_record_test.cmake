@@ -45,6 +45,16 @@ if(result EQUAL 0 OR output MATCHES "<gpx")
   message(FATAL_ERROR "log2gpx accepted a non-finite coordinate")
 endif()
 
+foreach(invalid IN ITEMS inf -inf 0x1p2 1e9999)
+  string(REPLACE "51.5" "${invalid}" invalid_coordinates "${prefix}")
+  file(WRITE "${input}" "${invalid_coordinates}ordinary\n")
+  execute_process(COMMAND "${LOG2GPX}" INPUT_FILE "${input}"
+                  OUTPUT_VARIABLE output ERROR_VARIABLE errors RESULT_VARIABLE result)
+  if(result EQUAL 0 OR output MATCHES "<gpx")
+    message(FATAL_ERROR "log2gpx accepted invalid coordinate ${invalid}")
+  endif()
+endforeach()
+
 file(WRITE "${input}" "0,1,2\n")
 execute_process(COMMAND "${LOG2GPX}" INPUT_FILE "${input}"
                 OUTPUT_VARIABLE output ERROR_VARIABLE errors RESULT_VARIABLE result)
