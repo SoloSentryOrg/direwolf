@@ -53,6 +53,7 @@
 #include "ax25_pad.h"
 #include "textcolor.h"
 #include "audio.h"
+#include "speech_runner.h"
 #include "digipeater.h"
 #include "cdigipeater.h"
 #include "config.h"
@@ -2558,17 +2559,20 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	  }
 
-/*
- * SPEECH  script 
- *
- * Specify script for text-to-speech function.		
- */
-
+/* Legacy packet-to-shell interface is intentionally unavailable. */
 	  else if (strcasecmp(t, "SPEECH") == 0) {
+	    p_audio_config->tts_script[0] = '\0';
+	    text_color_set(DW_COLOR_ERROR);
+	    dw_printf ("Line %d: Legacy SPEECH is disabled; migrate to SPEECH_STDIN.\n", line);
+	    continue;
+	  }
+
+/* SPEECH_STDIN takes an absolute local runner path. Packet text goes to stdin. */
+	  else if (strcasecmp(t, "SPEECH_STDIN") == 0) {
 
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
-	      dw_printf ("Line %d: SPEECH can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
+	      dw_printf ("Line %d: SPEECH_STDIN can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
 	    t = split(NULL,0);
@@ -2578,19 +2582,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 	    
-	    /* See if we can run it. */
-
-	    if (xmit_speak_it(t, -1, " ") == 0) {
-	      if (strlcpy (p_audio_config->tts_script, t, sizeof(p_audio_config->tts_script)) >= sizeof(p_audio_config->tts_script)) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Line %d: Script for text-to-speech function is too long.\n", line);
-	      }
-	    }
-	    else {
+	    if (strlen(t) >= sizeof(p_audio_config->tts_script) ||
+	        !speech_runner_validate(t)) {
+	      p_audio_config->tts_script[0] = '\0';
 	      text_color_set(DW_COLOR_ERROR);
-	      dw_printf ("Line %d: Error trying to run Text-to-Speech function.\n", line);
+	      dw_printf ("Line %d: SPEECH_STDIN requires a valid absolute local runner path and supported OS.\n", line);
 	      continue;
-	   }
+	    }
+	    strlcpy (p_audio_config->tts_script, t, sizeof(p_audio_config->tts_script));
 	  }
 
 /*

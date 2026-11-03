@@ -92,6 +92,7 @@ list(APPEND direwolf_SOURCES
   recv.c
   rrbb.c
   server.c
+  speech_runner.c
   symbols.c
   telemetry.c
   textcolor.c

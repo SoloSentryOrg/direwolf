@@ -114,6 +114,9 @@ Youtube has many interesting and helpful videos.  Searching for [direwolf tnc](h
 
 ## Installation
 
+The secure text-to-speech runner uses `SPEECH_STDIN`; see the
+[migration guide](doc/SPEECH_STDIN.md) before enabling or updating SPEECH.
+
 ### Windows
 
 Go to the [**releases** page](https://github.com/wb2osz/direwolf/releases).   Download a zip file with "win" in its name, unzip it, and run direwolf.exe from a command window.

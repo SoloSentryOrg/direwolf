@@ -77,6 +77,7 @@
 #include "xid.h"
 #include "dlq.h"
 #include "server.h"
+#include "speech_runner.h"
 
 
 /*
@@ -1129,10 +1130,15 @@ static void xmit_speech (int c, packet_t pp)
 	}
 
 	info_len = ax25_get_info (pp, &pinfo);
-	(void)info_len;
+	if (info_len < 0 || !speech_runner_text_valid(pinfo, (size_t)info_len)) {
+	  text_color_set(DW_COLOR_ERROR);
+	  dw_printf ("[%d.speech] Rejected invalid or empty packet text.\n", c);
+	  ax25_delete (pp);
+	  return;
+	}
 
 	text_color_set(DW_COLOR_XMIT);
-	dw_printf ("[%d.speech%s] \"%s\"\n", c, ts, pinfo);
+	dw_printf ("[%d.speech%s] %d bytes\n", c, ts, info_len);
 
 
 	if (strlen(save_audio_config_p->tts_script) == 0) {
@@ -1151,7 +1157,11 @@ static void xmit_speech (int c, packet_t pp)
  * Invoke the speech-to-text script.
  */	
 
-	xmit_speak_it (save_audio_config_p->tts_script, c, (char*)pinfo);
+	if (speech_runner_run (save_audio_config_p->tts_script, c, pinfo,
+	                       (size_t)info_len) != 0) {
+	  text_color_set(DW_COLOR_ERROR);
+	  dw_printf ("Text-to-speech runner failed or timed out.\n");
+	}
 
 /*
  * Turn off transmitter.
@@ -1161,56 +1171,6 @@ static void xmit_speech (int c, packet_t pp)
 	ax25_delete (pp);
 
 } /* end xmit_speech */
-
-
-/* Broken out into separate function so configuration can validate it. */
-/* Returns 0 for success. */
-
-int xmit_speak_it (char *script, int c, char *orig_msg)
-{
-	int err;
-	char msg[2000];
-	char cmd[sizeof(msg) + 16];
-	char *p;
-
-/* Remove any quotes because it will mess up command line argument parsing. */
-
-	strlcpy (msg, orig_msg, sizeof(msg));
-
-	for (p=msg; *p!='\0'; p++) {
-	  if (*p == '"') *p = ' ';
-	}
-
-#if __WIN32__
-	snprintf (cmd, sizeof(cmd), "%s %d \"%s\" >nul", script, c, msg);
-#else
-	snprintf (cmd, sizeof(cmd), "%s %d \"%s\"", script, c, msg);
-#endif
-
-	//text_color_set(DW_COLOR_DEBUG);
-	//dw_printf ("cmd=%s\n", cmd);
-
-	err = system (cmd);
-
-	if (err != 0) {
-	  char cwd[1000];
-	  char path[3000];
-	  char *ignore;
-
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("Failed to run text-to-speech script, %s\n", script);
-
-	  ignore = getcwd (cwd, sizeof(cwd));
-	  (void)ignore;
-	  strlcpy (path, getenv("PATH"), sizeof(path));
-
-	  dw_printf ("CWD = %s\n", cwd);
-	  dw_printf ("PATH = %s\n", path);
-	
-	}
-	return (err);
-}
-
 
 
 /*-------------------------------------------------------------------

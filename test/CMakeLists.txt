@@ -2,6 +2,26 @@
 # because configure_file() is done at configuration time
 
 set(CUSTOM_TEST_BINARY_DIR "${CMAKE_BINARY_DIR}/test")
+
+add_executable(speech_runner_test
+  speech_runner_test.c
+  ${CUSTOM_SRC_DIR}/speech_runner.c
+  )
+target_include_directories(speech_runner_test PRIVATE ${CUSTOM_SRC_DIR})
+target_compile_definitions(speech_runner_test PRIVATE SPEECH_WAIT_MS=250)
+if(WIN32)
+  configure_file(speech_runner_test.bat "${CUSTOM_TEST_BINARY_DIR}/speech_runner_test.bat" COPYONLY)
+endif()
+add_test(speech-runner "${CUSTOM_TEST_BINARY_DIR}/speech_runner_test${CMAKE_EXECUTABLE_SUFFIX}")
+if(NOT WIN32)
+  add_executable(speech_runner_fork_test
+    speech_runner_test.c
+    ${CUSTOM_SRC_DIR}/speech_runner.c
+    )
+  target_include_directories(speech_runner_fork_test PRIVATE ${CUSTOM_SRC_DIR})
+  target_compile_definitions(speech_runner_fork_test PRIVATE SPEECH_WAIT_MS=250 SPEECH_FORCE_FORK=1)
+  add_test(speech-runner-fork "${CUSTOM_TEST_BINARY_DIR}/speech_runner_fork_test")
+endif()
 set(GEN_PACKETS_BIN "${CMAKE_BINARY_DIR}/src/gen_packets${CMAKE_EXECUTABLE_SUFFIX}")
 set(ATEST_BIN "${CMAKE_BINARY_DIR}/src/atest${CMAKE_EXECUTABLE_SUFFIX}")
 set(FXSEND_BIN "${CMAKE_BINARY_DIR}/test/fxsend${CMAKE_EXECUTABLE_SUFFIX}")
