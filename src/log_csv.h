@@ -8,9 +8,10 @@
 
 /* Bound both the source field and RFC 4180-style quoted CSV output. */
 /* Return zero and leave an empty output if either boundary is invalid. */
-static inline int quote_for_csv(char *out, size_t outsize,
-                                const char *in, size_t in_capacity)
+static int quote_for_csv(char *out, size_t outsize,
+                         const char *in, size_t in_capacity)
 {
+  size_t i;
   size_t length = 0;
   size_t required = 1; /* NUL terminator. */
   size_t used = 0;
@@ -34,7 +35,7 @@ static inline int quote_for_csv(char *out, size_t outsize,
       return 0;
     required += 2; /* Surrounding quotes. */
   }
-  for (size_t i = 0; i < length; ++i) {
+  for (i = 0; i < length; ++i) {
     if (required >= outsize)
       return 0;
     ++required;
@@ -52,7 +53,7 @@ static inline int quote_for_csv(char *out, size_t outsize,
   }
 
   out[used++] = '"';
-  for (size_t i = 0; i < length; ++i) {
+  for (i = 0; i < length; ++i) {
     if (in[i] == '"')
       out[used++] = '"';
     out[used++] = in[i];
