@@ -8,6 +8,8 @@ target_include_directories(log_csv_record_test PRIVATE ${CUSTOM_SRC_DIR})
 add_test(log-csv-record "${CUSTOM_TEST_BINARY_DIR}/log_csv_record_test${CMAKE_EXECUTABLE_SUFFIX}")
 add_executable(log_csv_writer_test
   log_csv_writer_test.c
+  ${CUSTOM_SRC_DIR}/ax25_pad.c
+  ${CUSTOM_SRC_DIR}/fcs_calc.c
   ${CUSTOM_SRC_DIR}/log.c
   ${CUSTOM_SRC_DIR}/textcolor.c)
 target_include_directories(log_csv_writer_test PRIVATE ${CUSTOM_SRC_DIR})
