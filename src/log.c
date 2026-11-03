@@ -50,9 +50,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #if __WIN32__
 #include <direct.h> 	// for _mkdir()
+#include <io.h>
 #endif
 
 #include "ax25_pad.h"
@@ -100,6 +102,43 @@ static int g_daily_names;
 static char g_log_path[80];
 static FILE *g_log_fp;
 static char g_open_fname[20];
+
+/* Create private logs and keep the stream in binary mode so CSV field bytes
+ * are not rewritten by the Windows CRT. Both file-name paths use this gate. */
+static FILE *open_log_append(const char *path)
+{
+	int fd;
+	int open_error;
+	FILE *stream;
+#if __WIN32__
+	fd = _open(path, _O_WRONLY | _O_CREAT | _O_APPEND | _O_BINARY |
+	                 _O_NOINHERIT, _S_IREAD | _S_IWRITE);
+	if (fd < 0) return NULL;
+	stream = _fdopen(fd, "ab");
+	if (stream == NULL) {
+	  open_error = errno;
+	  _close(fd);
+	  errno = open_error;
+	}
+#else
+	int flags = O_WRONLY | O_CREAT | O_APPEND;
+#ifdef O_CLOEXEC
+	flags |= O_CLOEXEC;
+#endif
+#ifdef O_NOFOLLOW
+	flags |= O_NOFOLLOW;
+#endif
+	fd = open(path, flags, S_IRUSR | S_IWUSR);
+	if (fd < 0) return NULL;
+	stream = fdopen(fd, "ab");
+	if (stream == NULL) {
+	  open_error = errno;
+	  close(fd);
+	  errno = open_error;
+	}
+#endif
+	return stream;
+}
 
 
 void log_init (int daily_names, char *path)
@@ -242,7 +281,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	    text_color_set(DW_COLOR_INFO);
 	    dw_printf("Opening log file \"%s\".\n", fname);
 
-	    g_log_fp = fopen (full_path, "ab");
+	    g_log_fp = open_log_append(full_path);
 
 	    if (g_log_fp != NULL) {
 	      strlcpy (g_open_fname, fname, sizeof(g_open_fname));
@@ -281,7 +320,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	    text_color_set(DW_COLOR_INFO);
 	    dw_printf("Opening log file \"%s\"\n", g_log_path);
 
-	    g_log_fp = fopen (g_log_path, "ab");
+	    g_log_fp = open_log_append(g_log_path);
 
 	    if (g_log_fp == NULL) {
 	      text_color_set(DW_COLOR_ERROR);

@@ -4,6 +4,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#if !__WIN32__
+#include <sys/stat.h>
+#endif
 
 #include "log.h"
 #include "log_csv_record.h"
@@ -56,13 +59,24 @@ int main(void)
   const char *expected[] = {"N0CALL", "A,B", "A\nB"};
   FILE *fp;
   int i, ok;
+#if !__WIN32__
+  mode_t previous_umask;
+  struct stat st;
+#endif
 
   remove(path);
+#if !__WIN32__
+  previous_umask = umask(0);
+#endif
   log_init(0, path);
   ok = write_frame("N0CALL", 1) &&
        write_frame("A,B   ", 0) &&
        write_frame("A\nB   ", 0);
   log_term();
+#if !__WIN32__
+  umask(previous_umask);
+  if (stat(path, &st) != 0 || (st.st_mode & 077) != 0) ok = 0;
+#endif
   if (!ok) {
     remove(path);
     return 1;
