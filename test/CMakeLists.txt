@@ -533,6 +533,8 @@ add_test(geotranz-valid-polar geotranz_input_test valid-polar)
 add_test(geotranz-malformed-zone geotranz_input_test malformed-zone)
 add_test(geotranz-short-polar geotranz_input_test short-polar)
 add_test(geotranz-non-ascii geotranz_input_test non-ascii)
+add_executable(log_csv_test ${CUSTOM_TEST_DIR}/log_csv_test.c)
+add_test(log-csv-bounds log_csv_test)
 add_test(xidtest xidtest)
 add_test(dtmftest dtmftest)
 

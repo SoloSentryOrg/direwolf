@@ -59,41 +59,7 @@
 #include "textcolor.h"
 #include "decode_aprs.h"
 #include "log.h"
-
-
-/*
- * CSV format needs quotes if value contains comma or quote.
- */
-
-static void quote_for_csv (char *out, size_t outsize, const char *in) {
-	const char *p;
-	char *q = out;
-	int need_quote = 0;
-
-	for (p = in; *p != '\0'; p++) {
-	  if (*p == ',' || *p == '"') {
-	    need_quote = 1;
-	    break;
-	  }
-	}
-
-// BUG: need to avoid buffer overflow on "out".   *strcpy*
-
-	if (need_quote) {
-	  *q++ = '"';
-	  for (p = in; *p != '\0'; p++) {
-	    if (*p == '"') {	
-	      *q++ = *p;
-	    }
-	    *q++ = *p;
-	  }
-	  *q++ = '"';
-	  *q = '\0';
-	}
-	else {
-	  strlcpy (out, in, outsize);
-	}
-}
+#include "log_csv.h"
 
 
 /*------------------------------------------------------------------
@@ -339,13 +305,15 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	  char slat[16], slon[16], sspd[12], scse[12], salt[12];
 	  char sfreq[20], soffs[10], stone[10];
 	  char sdti[10];
-	  char sname[24];
+	  char sname[2 * sizeof(A->g_name) + 1];
 	  char ssymbol[8];
-	  char smfr[60];
-	  char sstatus[40];
-	  char stelemetry[200];
-	  char scomment[256];
+	  char smfr[2 * sizeof(A->g_mfr) + 1];
+	  char sstatus[2 * sizeof(A->g_mic_e_status) + 1];
+	  char stelemetry[2 * sizeof(A->g_telemetry) + 1];
+	  char scomment[2 * sizeof(A->g_comment) + 1];
 	  char alevel_text[40];
+	  const char *name_input = A->g_name[0] != '\0' ? A->g_name : A->g_src;
+	  size_t name_capacity = A->g_name[0] != '\0' ? sizeof(A->g_name) : sizeof(A->g_src);
 
 
 
@@ -387,20 +355,26 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	  if (pp != NULL) {
 	    stemp[0] = ax25_get_dti(pp);
 	    stemp[1] = '\0';
-	    quote_for_csv (sdti, sizeof(sdti), stemp);
+	    if (!quote_for_csv (sdti, sizeof(sdti), stemp, 2)) {
+	      text_color_set(DW_COLOR_ERROR);
+	      dw_printf ("Unable to format CSV log record; skipping.\n");
+	      return;
+	    }
 	  }
-
-	  quote_for_csv (sname, sizeof(sname), (strlen(A->g_name) > 0) ? A->g_name : A->g_src);
 
 	  stemp[0] = A->g_symbol_table;
 	  stemp[1] = A->g_symbol_code;
 	  stemp[2] = '\0';
-	  quote_for_csv (ssymbol, sizeof(ssymbol), stemp);
-
-	  quote_for_csv (smfr, sizeof(smfr), A->g_mfr);
-	  quote_for_csv (sstatus, sizeof(sstatus), A->g_mic_e_status);
-	  quote_for_csv (stelemetry, sizeof(stelemetry), A->g_telemetry);
-	  quote_for_csv (scomment, sizeof(scomment), A->g_comment);
+	  if (!quote_for_csv (sname, sizeof(sname), name_input, name_capacity) ||
+	      !quote_for_csv (ssymbol, sizeof(ssymbol), stemp, 3) ||
+	      !quote_for_csv (smfr, sizeof(smfr), A->g_mfr, sizeof(A->g_mfr)) ||
+	      !quote_for_csv (sstatus, sizeof(sstatus), A->g_mic_e_status, sizeof(A->g_mic_e_status)) ||
+	      !quote_for_csv (stelemetry, sizeof(stelemetry), A->g_telemetry, sizeof(A->g_telemetry)) ||
+	      !quote_for_csv (scomment, sizeof(scomment), A->g_comment, sizeof(A->g_comment))) {
+	    text_color_set(DW_COLOR_ERROR);
+	    dw_printf ("Unable to format CSV log record; skipping.\n");
+	    return;
+	  }
 
 	  strlcpy (slat, "", sizeof(slat));  if (A->g_lat != G_UNKNOWN)         snprintf (slat, sizeof(slat), "%.6f", A->g_lat);
 	  strlcpy (slon, "", sizeof(slon));  if (A->g_lon != G_UNKNOWN)         snprintf (slon, sizeof(slon), "%.6f", A->g_lon);
