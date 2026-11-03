@@ -3065,7 +3065,7 @@ static void weather_data (decode_aprs_t *A, char *wdata, int wind_prefix)
 	
 	if (wp[3] == '/')
 	{
-	  if (sscanf (wp, "%3d", &n))
+	  if (sscanf (wp, "%3d", &n) == 1)
 	  {
 	    // Data Extension format.
 	    // Fine point:  Officially, should be values of 001-360.
@@ -3073,7 +3073,7 @@ static void weather_data (decode_aprs_t *A, char *wdata, int wind_prefix)
 	    // In practice we see do see "000" here.
 	    A->g_course = n;
 	  }
-	  if (sscanf (wp+4, "%3d", &n))
+	  if (sscanf (wp+4, "%3d", &n) == 1)
 	  {
 	    A->g_speed_mph = DW_KNOTS_TO_MPH(n);  /* yes, in knots */
 	  }
@@ -4156,11 +4156,11 @@ static int data_extension_comment (decode_aprs_t *A, char *pdext)
 
 	if (pdext[3] == '/')
 	{
-	  if (sscanf (pdext, "%3d", &n))
+	  if (sscanf (pdext, "%3d", &n) == 1)
 	  {
 	    A->g_course = n;
 	  }
-	  if (sscanf (pdext+4, "%3d", &n))
+	  if (sscanf (pdext+4, "%3d", &n) == 1)
 	  {
 	    A->g_speed_mph = DW_KNOTS_TO_MPH(n);
 	  }
@@ -4199,7 +4199,7 @@ static int data_extension_comment (decode_aprs_t *A, char *pdext)
 
 	if (strncmp(pdext, "RNG", 3) == 0)
 	{
-	  if (sscanf (pdext+3, "%4d", &n))
+	  if (sscanf (pdext+3, "%4d", &n) == 1)
 	  {
 	    A->g_range = n;
 	  }
