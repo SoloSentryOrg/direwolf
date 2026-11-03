@@ -3975,14 +3975,18 @@ time_t get_timestamp (decode_aprs_t *A, char *p)
 	    return ((time_t)0);
 	}
 
+	struct tm tm_buf;
 	struct tm *ptm;
 
 	time_t ts;
 
 	ts = time(NULL);
-	// FIXME: use gmtime_r instead.
-	// Besides not being thread safe, gmtime could possibly return null.
-	ptm = gmtime(&ts);
+	ptm = gmtime_r(&ts, &tm_buf);
+	if (ptm == NULL) {
+	  text_color_set(DW_COLOR_ERROR);
+	  dw_printf("Could not convert APRS timestamp to UTC.\n");
+	  return ((time_t)0);
+	}
 
 	pdhm = (void *)p;
 	phms = (void *)p;
