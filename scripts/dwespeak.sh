@@ -1,5 +1,5 @@
 #!/bin/bash
-chan=$1
-msg=$2
-sleep 1
-espeak -v en-sc "$msg"
+case "$1" in
+  ''|*[!0-9]*) exit 2 ;;
+esac
+exec espeak -v en-sc --stdin
