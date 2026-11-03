@@ -13,6 +13,7 @@ add_executable(log_csv_writer_test
   ${CUSTOM_SRC_DIR}/log.c
   ${CUSTOM_SRC_DIR}/textcolor.c)
 target_include_directories(log_csv_writer_test PRIVATE ${CUSTOM_SRC_DIR})
+target_link_libraries(log_csv_writer_test ${MISC_LIBRARIES})
 add_test(NAME log-csv-writer COMMAND "${CUSTOM_TEST_BINARY_DIR}/log_csv_writer_test${CMAKE_EXECUTABLE_SUFFIX}")
 add_test(NAME log2gpx-record COMMAND ${CMAKE_COMMAND}
   -DLOG2GPX=$<TARGET_FILE:log2gpx>
