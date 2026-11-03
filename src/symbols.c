@@ -716,7 +716,8 @@ void symbols_from_dest_or_src (char dti, char *src, char *dest, char *symtab, ch
  * Inputs:	symtab		/, \, 0-9, A-Z
  *		symbol		any printable character ! to ~ 
  *
- * Outputs:	dest		6 character "destination" of the forms 
+ * Outputs:	dest		At least 7 bytes for a 6-character destination
+ *				and its terminating NUL, of the forms
  *					GPSCnn  - primary table.
  *					GPSEnn  - alternate table.
  *					GPSxyz  - alternate with overlay.
@@ -752,7 +753,7 @@ int symbols_into_dest (char symtab, char symbol, char *dest)
 	dw_printf ("Could not convert symbol \"%c%c\" to GPSxyz destination format.\n",
 			symtab, symbol);
 
-	strlcpy (dest, "GPS???", sizeof(dest));	/* Error. */
+	strlcpy (dest, "GPS???", 7);	/* Error. */
 	return (1);
 }
 
