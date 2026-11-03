@@ -61,6 +61,13 @@
 #include "log.h"
 #include "log_csv.h"
 
+/* Preserve embedded field bytes while retaining each platform's row ending. */
+#if __WIN32__
+#define DW_LOG_CSV_EOL "\r\n"
+#else
+#define DW_LOG_CSV_EOL "\n"
+#endif
+
 
 /*------------------------------------------------------------------
  *
@@ -235,7 +242,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	    text_color_set(DW_COLOR_INFO);
 	    dw_printf("Opening log file \"%s\".\n", fname);
 
-	    g_log_fp = fopen (full_path, "a");
+	    g_log_fp = fopen (full_path, "ab");
 
 	    if (g_log_fp != NULL) {
 	      strlcpy (g_open_fname, fname, sizeof(g_open_fname));
@@ -252,7 +259,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	    // only if this will be the first line.
 	
 	    if ( ! already_there) {
-	      fprintf (g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment\n");
+	      fprintf (g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment" DW_LOG_CSV_EOL);
 	    }
 	  }
 	}
@@ -274,7 +281,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	    text_color_set(DW_COLOR_INFO);
 	    dw_printf("Opening log file \"%s\"\n", g_log_path);
 
-	    g_log_fp = fopen (g_log_path, "a");
+	    g_log_fp = fopen (g_log_path, "ab");
 
 	    if (g_log_fp == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -288,7 +295,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	    // only if this will be the first line.
 
 	    if ( ! already_there) {
-	      fprintf (g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment\n");
+	      fprintf (g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment" DW_LOG_CSV_EOL);
 	    }
 	  }
 	}
@@ -391,7 +398,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	  strlcpy (stone, "", sizeof(stone));  if (A->g_tone   != G_UNKNOWN) snprintf (stone, sizeof(stone), "%.1f", A->g_tone);
 	                       if (A->g_dcs    != G_UNKNOWN) snprintf (stone, sizeof(stone), "D%03o", A->g_dcs);
 
-	  fprintf (g_log_fp, "%d,%d,%s,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", 
+	  fprintf (g_log_fp, "%d,%d,%s,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s" DW_LOG_CSV_EOL,
 			chan, (int)now, itime, 
 			ssource, sheard, alevel_text, (int)retries, sdti,
 			sname, ssymbol,
