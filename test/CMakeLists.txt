@@ -517,6 +517,22 @@ add_executable(geotranz_error_string_test
   ${CUSTOM_GEOTRANZ_DIR}/error_string.c
   )
 add_test(geotranz_error_string_test geotranz_error_string_test)
+add_executable(geotranz_input_test
+  ${CUSTOM_TEST_DIR}/geotranz_input_test.c
+  )
+target_link_libraries(geotranz_input_test
+  ${GEOTRANZ_LIBRARIES}
+  ${MISC_LIBRARIES}
+  )
+add_test(geotranz-invalid-polar-mgrs geotranz_input_test invalid-polar-mgrs)
+add_test(geotranz-invalid-polar-usng geotranz_input_test invalid-polar-usng)
+add_test(geotranz-trailing-mgrs geotranz_input_test trailing-mgrs)
+add_test(geotranz-trailing-usng geotranz_input_test trailing-usng)
+add_test(geotranz-valid geotranz_input_test valid)
+add_test(geotranz-valid-polar geotranz_input_test valid-polar)
+add_test(geotranz-malformed-zone geotranz_input_test malformed-zone)
+add_test(geotranz-short-polar geotranz_input_test short-polar)
+add_test(geotranz-non-ascii geotranz_input_test non-ascii)
 add_test(xidtest xidtest)
 add_test(dtmftest dtmftest)
 

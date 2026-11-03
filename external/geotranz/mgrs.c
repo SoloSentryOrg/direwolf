@@ -336,7 +336,7 @@ long Check_Zone(char* MGRS, long* zone_exists)
   while (MGRS[i] == ' ')
     i++;  
   j = i;
-  while (isdigit(MGRS[i]))
+  while (isdigit((unsigned char)MGRS[i]))
     i++;
   num_digits = i - j;
   if (num_digits <= 2)
@@ -443,10 +443,12 @@ long Break_MGRS_String (char* MGRS,
   long j = 0;
   long error_code = MGRS_NO_ERROR;
 
+  *Zone = 0;
+
   while (MGRS[i] == ' ')
     i++;  /* skip any leading blanks */
   j = i;
-  while (isdigit(MGRS[i]))
+  while (isdigit((unsigned char)MGRS[i]))
     i++;
   num_digits = i - j;
   if (num_digits <= 2)
@@ -466,28 +468,33 @@ long Break_MGRS_String (char* MGRS,
     error_code |= MGRS_STRING_ERROR;
   j = i;
 
-  while (isalpha(MGRS[i]))
+  while (isalpha((unsigned char)MGRS[i]))
     i++;
   num_letters = i - j;
   if (num_letters == 3)
   {
     /* get letters */
-    Letters[0] = (toupper(MGRS[j]) - (long)'A');
-    if ((Letters[0] == LETTER_I) || (Letters[0] == LETTER_O))
+    Letters[0] = (toupper((unsigned char)MGRS[j]) - (long)'A');
+    if ((Letters[0] < LETTER_A) || (Letters[0] > LETTER_Z) ||
+        (Letters[0] == LETTER_I) || (Letters[0] == LETTER_O))
       error_code |= MGRS_STRING_ERROR;
-    Letters[1] = (toupper(MGRS[j+1]) - (long)'A');
-    if ((Letters[1] == LETTER_I) || (Letters[1] == LETTER_O))
+    Letters[1] = (toupper((unsigned char)MGRS[j+1]) - (long)'A');
+    if ((Letters[1] < LETTER_A) || (Letters[1] > LETTER_Z) ||
+        (Letters[1] == LETTER_I) || (Letters[1] == LETTER_O))
       error_code |= MGRS_STRING_ERROR;
-    Letters[2] = (toupper(MGRS[j+2]) - (long)'A');
-    if ((Letters[2] == LETTER_I) || (Letters[2] == LETTER_O))
+    Letters[2] = (toupper((unsigned char)MGRS[j+2]) - (long)'A');
+    if ((Letters[2] < LETTER_A) || (Letters[2] > LETTER_Z) ||
+        (Letters[2] == LETTER_I) || (Letters[2] == LETTER_O))
       error_code |= MGRS_STRING_ERROR;
   }
   else
     error_code |= MGRS_STRING_ERROR;
   j = i;
-  while (isdigit(MGRS[i]))
+  while (isdigit((unsigned char)MGRS[i]))
     i++;
   num_digits = i - j;
+  if (MGRS[i] != '\0')
+    error_code |= MGRS_STRING_ERROR;
   if ((num_digits <= 10) && (num_digits%2 == 0))
   {
     long n;
@@ -503,13 +510,17 @@ long Break_MGRS_String (char* MGRS,
     {
       strncpy (east_string, MGRS+j, n);
       east_string[n] = 0;
-      sscanf (east_string, "%ld", &east);
       strncpy (north_string, MGRS+j+n, n);
       north_string[n] = 0;
-      sscanf (north_string, "%ld", &north);
-      multiplier = pow (10.0, 5 - n);
-      *Easting = east * multiplier;
-      *Northing = north * multiplier;
+      if ((sscanf (east_string, "%ld", &east) != 1) ||
+          (sscanf (north_string, "%ld", &north) != 1))
+        error_code |= MGRS_STRING_ERROR;
+      else
+      {
+        multiplier = pow (10.0, 5 - n);
+        *Easting = east * multiplier;
+        *Northing = north * multiplier;
+      }
     }
     else
     {
@@ -1271,6 +1282,9 @@ long Convert_MGRS_To_UPS ( char   *MGRS,
     error_code |= MGRS_STRING_ERROR;
   else
   {
+    if (!error_code && letters[0] != LETTER_A && letters[0] != LETTER_B &&
+        letters[0] != LETTER_Y && letters[0] != LETTER_Z)
+      error_code |= MGRS_STRING_ERROR;
     if (!error_code)
     {
       if (letters[0] >= LETTER_Y)
