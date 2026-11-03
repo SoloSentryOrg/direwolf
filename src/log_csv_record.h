@@ -10,6 +10,31 @@
 #define DW_CSV_RECORD_SIZE 4096
 #define DW_CSV_FIELD_COUNT 22
 
+/* GPX declares UTF-8; reject malformed sequences instead of emitting bad XML. */
+static int dw_csv_utf8_valid(const char *text)
+{
+  const unsigned char *p = (const unsigned char *)text;
+  while (*p != 0) {
+    unsigned char first = *p;
+    unsigned int length, i;
+    if (first < 0x80) { ++p; continue; }
+    if (first >= 0xc2 && first <= 0xdf) length = 2;
+    else if (first >= 0xe0 && first <= 0xef) length = 3;
+    else if (first >= 0xf0 && first <= 0xf4) length = 4;
+    else return 0;
+    for (i = 1; i < length; ++i) {
+      if (p[i] == 0 || p[i] < 0x80 || p[i] > 0xbf) return 0;
+    }
+    if ((first == 0xe0 && p[1] < 0xa0) ||
+        (first == 0xed && p[1] > 0x9f) ||
+        (first == 0xf0 && p[1] < 0x90) ||
+        (first == 0xf4 && p[1] > 0x8f) ||
+        (first == 0xef && p[1] == 0xbf && p[2] >= 0xbe)) return 0;
+    p += length;
+  }
+  return 1;
+}
+
 /* Return 1 for a complete record, 0 for EOF, or -1 for invalid/overlong input. */
 static int dw_csv_read_record(FILE *fp, char *record, size_t capacity)
 {
@@ -30,6 +55,7 @@ static int dw_csv_read_record(FILE *fp, char *record, size_t capacity)
   if (record[length - 1] == '\n') --length;
   if (length > 0 && record[length - 1] == '\r') --length;
   record[length] = '\0';
+  if (!dw_csv_utf8_valid(record)) return -1;
   return 1;
 }
 

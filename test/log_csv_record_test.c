@@ -108,5 +108,9 @@ int main(void)
   if (!check_station_fields()) return 8;
   if (!check("0,0,2026-11-03T16:00:00Z,N0CALL,N0CALL,,0,,STATION,,51.5,-0.1,,,,,,,,,,\"bad\001byte\"\n",
              -1, 0, "")) return 9;
+  if (!check("0,0,2026-11-03T16:00:00Z,N0CALL,N0CALL,,0,,STATION,,51.5,-0.1,,,,,,,,,,bad\377" "byte\n",
+             -1, 0, "")) return 10;
+  if (!check("0,0,2026-11-03T16:00:00Z,N0CALL,N0CALL,,0,,STATION,,51.5,-0.1,,,,,,,,,,caf\303\251\n",
+             1, 1, "caf\303\251")) return 11;
   return 0;
 }

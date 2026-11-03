@@ -23,6 +23,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
+#include <float.h>
+#include <limits.h>
 #include "log_csv_record.h"
 
 
@@ -55,6 +58,54 @@ static void read_csv(FILE *fp);
 static int compar(const void *a, const void *b);
 static void process_things (int first, int last);
 
+/* Retain complete code points when fixed-size GPX fields need a prefix. */
+static void dw_csv_utf8_copy(char *dest, size_t capacity, const char *source)
+{
+  size_t used = 0;
+  const unsigned char *p = (const unsigned char *)source;
+  if (capacity == 0) return;
+  while (*p != 0) {
+    size_t length = *p < 0x80 ? 1 : (*p < 0xe0 ? 2 : (*p < 0xf0 ? 3 : 4));
+    if (length >= capacity - used) break;
+    memcpy(dest + used, p, length);
+    used += length;
+    p += length;
+  }
+  dest[used] = '\0';
+}
+
+static void dw_csv_utf8_append(char *dest, size_t capacity, const char *source)
+{
+  size_t used = strlen(dest);
+  if (used < capacity) dw_csv_utf8_copy(dest + used, capacity - used, source);
+}
+
+static int csv_number(const char *text, double *value)
+{
+	char *end;
+	double parsed;
+	if (text == NULL || *text == '\0') return 0;
+	errno = 0;
+	parsed = strtod(text, &end);
+	if (end == text || *end != '\0' || errno == ERANGE ||
+	    !(parsed >= -DBL_MAX && parsed <= DBL_MAX)) return 0;
+	*value = parsed;
+	return 1;
+}
+
+static int csv_integer(const char *text, int *value)
+{
+	char *end;
+	long parsed;
+	if (text == NULL || *text == '\0') return 0;
+	errno = 0;
+	parsed = strtol(text, &end, 10);
+	if (end == text || *end != '\0' || errno == ERANGE ||
+	    parsed < INT_MIN || parsed > INT_MAX) return 0;
+	*value = (int)parsed;
+	return 1;
+}
+
 
 int main (int argc, char *argv[]) 
 {
@@ -69,6 +120,10 @@ int main (int argc, char *argv[])
 	num_things = 0;
 	max_things = 1000;
 	things = malloc (max_things * sizeof(thing_t));
+	if (things == NULL) {
+	  fprintf(stderr, "Cannot allocate GPX records.\n");
+	  exit(1);
+	}
 
 /*
  * Read files listed or stdin if none.
@@ -246,30 +301,60 @@ static void read_csv(FILE *fp)
 	    float speed = UNKNOWN_VALUE;
 	    float course = UNKNOWN_VALUE;
 	    float alt = UNKNOWN_VALUE;
+	    double latitude, longitude, number;
 	    char stemp[16], desc[32], comment[256];
+	    if (!csv_number(platitude, &latitude) || latitude < -90 || latitude > 90 ||
+	        !csv_number(plongitude, &longitude) || longitude < -180 || longitude > 180) {
+	      fprintf(stderr, "Invalid CSV coordinates.\n");
+	      exit(1);
+	    }
 
 	    if (pspeed != NULL && strlen(pspeed) > 0) {
-	      speed = KNOTS_TO_METERS_PER_SEC(atof(pspeed));
+	      if (!csv_number(pspeed, &number) || number < -FLT_MAX || number > FLT_MAX) {
+	        fprintf(stderr, "Invalid CSV speed.\n");
+	        exit(1);
+	      }
+	      speed = (float)KNOTS_TO_METERS_PER_SEC(number);
 	    }
 	    if (pcourse != NULL && strlen(pcourse) > 0) {
-	      course = atof(pcourse);
+	      if (!csv_number(pcourse, &number) || number < -FLT_MAX || number > FLT_MAX) {
+	        fprintf(stderr, "Invalid CSV course.\n");
+	        exit(1);
+	      }
+	      course = (float)number;
 	    }
 	    if (paltitude != NULL && strlen(paltitude) > 0) {
-	      alt = atof(platitude);
+	      if (!csv_number(paltitude, &number) || number < -FLT_MAX || number > FLT_MAX) {
+	        fprintf(stderr, "Invalid CSV altitude.\n");
+	        exit(1);
+	      }
+	      alt = (float)number;
 	    }
 
 /* combine freq/offset/tone into one description string. */
 
 	    if (pfreq != NULL && strlen(pfreq) > 0) {
-	      double freq = atof(pfreq);
-	      snprintf (desc, sizeof(desc), "%.3f MHz", freq);
+	      int written;
+	      if (!csv_number(pfreq, &number)) {
+	        fprintf(stderr, "Invalid CSV frequency.\n");
+	        exit(1);
+	      }
+	      written = snprintf (desc, sizeof(desc), "%.3f MHz", number);
+	      if (written < 0 || (size_t)written >= sizeof(desc)) {
+	        fprintf(stderr, "CSV frequency is too long.\n");
+	        exit(1);
+	      }
 	    }
 	    else {
 	      strlcpy (desc, "", sizeof(desc));
 	    }
 
 	    if (poffset != NULL && strlen(poffset) > 0) {
-	      int offset = atoi(poffset);
+	      int offset;
+	      if (!csv_integer(poffset, &offset)) {
+	        fprintf(stderr, "Invalid CSV offset.\n");
+	        exit(1);
+	      }
 	      if (offset != 0 && offset % 1000 == 0) {
 	        snprintf (stemp, sizeof(stemp), "%+dM", offset / 1000);
 	      }
@@ -277,44 +362,62 @@ static void read_csv(FILE *fp)
 	        snprintf (stemp, sizeof(stemp), "%+dk", offset);
 	      }
 	      if (strlen(desc) > 0) strlcat (desc, " ", sizeof(desc));
-	      strlcat (desc, stemp, sizeof(desc));
+	      dw_csv_utf8_append(desc, sizeof(desc), stemp);
 	    }
 
 	    if (ptone != NULL && strlen(ptone) > 0) {
 	      if (*ptone == 'D') {
-	        snprintf (stemp, sizeof(stemp), "DCS %s", ptone+1);
+	        dw_csv_utf8_copy(stemp, sizeof(stemp), "DCS ");
+	        dw_csv_utf8_append(stemp, sizeof(stemp), ptone+1);
 	      }
 	      else {
-	        snprintf (stemp, sizeof(stemp), "PL %s", ptone);
+	        dw_csv_utf8_copy(stemp, sizeof(stemp), "PL ");
+	        dw_csv_utf8_append(stemp, sizeof(stemp), ptone);
 	      }
 	      if (strlen(desc) > 0) strlcat (desc, " ", sizeof(desc));
-	      strlcat (desc, stemp, sizeof(desc));
+	      dw_csv_utf8_append(desc, sizeof(desc), stemp);
 	    }
 
 	    strlcpy (comment, "", sizeof(comment));
 	    if (pstatus != NULL && strlen(pstatus) > 0) {
-	      strlcpy (comment, pstatus, sizeof(comment));
+	      dw_csv_utf8_copy(comment, sizeof(comment), pstatus);
 	    }
 	    if (pcomment != NULL && strlen(pcomment) > 0) {
 	      if (strlen(comment) > 0) strlcat (comment, ", ", sizeof(comment));
-	      strlcat (comment, pcomment, sizeof(comment));
+	      dw_csv_utf8_append(comment, sizeof(comment), pcomment);
 	    }
 	    
 	    if (num_things == max_things) {
-	      /* It's full.  Grow the array by 50%. */
-  	      max_things += max_things / 2;
-	      things = realloc (things, max_things*sizeof(thing_t));	
+	      /* Grow without losing the old allocation on failure. */
+	      int next_max;
+	      thing_t *larger;
+	      if (max_things > INT_MAX - max_things / 2) {
+	        fprintf(stderr, "Too many GPX records.\n");
+	        exit(1);
+	      }
+	      next_max = max_things + max_things / 2;
+	      if ((size_t)next_max > ((size_t)-1) / sizeof(*things)) {
+	        fprintf(stderr, "Too many GPX records.\n");
+	        exit(1);
+	      }
+	      larger = realloc(things, (size_t)next_max * sizeof(*things));
+	      if (larger == NULL) {
+	        fprintf(stderr, "Cannot allocate GPX records.\n");
+	        exit(1);
+	      }
+	      things = larger;
+	      max_things = next_max;
 	    }
 
-	    things[num_things].lat = atof(platitude);
-	    things[num_things].lon = atof(plongitude);
+	    things[num_things].lat = latitude;
+	    things[num_things].lon = longitude;
 	    things[num_things].speed = speed;
 	    things[num_things].course = course;
 	    things[num_things].alt = alt;
-	    strlcpy (things[num_things].time, pisotime, sizeof(things[num_things].time));
-	    strlcpy (things[num_things].name, pname, sizeof(things[num_things].name));
-	    strlcpy (things[num_things].desc, desc, sizeof(things[num_things].desc));
-	    strlcpy (things[num_things].comment, comment, sizeof(things[num_things].comment));
+	    dw_csv_utf8_copy(things[num_things].time, sizeof(things[num_things].time), pisotime);
+	    dw_csv_utf8_copy(things[num_things].name, sizeof(things[num_things].name), pname);
+	    dw_csv_utf8_copy(things[num_things].desc, sizeof(things[num_things].desc), desc);
+	    dw_csv_utf8_copy(things[num_things].comment, sizeof(things[num_things].comment), comment);
 
 	    num_things++;
 	  }

@@ -27,6 +27,24 @@ if(multiline_comment EQUAL -1)
   message(FATAL_ERROR "log2gpx lost a quoted line break")
 endif()
 
+string(REPEAT "é" 50 unicode_comment)
+string(REPEAT "é" 39 unicode_prefix)
+file(WRITE "${input}" "${prefix}${unicode_comment}\n")
+execute_process(COMMAND "${LOG2GPX}" INPUT_FILE "${input}"
+                OUTPUT_VARIABLE output ERROR_VARIABLE errors RESULT_VARIABLE result)
+string(FIND "${output}" "<cmt>${unicode_prefix}</cmt>" safe_unicode)
+if(NOT result EQUAL 0 OR safe_unicode EQUAL -1)
+  message(FATAL_ERROR "log2gpx did not preserve complete UTF-8 code points: ${errors}")
+endif()
+
+string(REPLACE "51.5" "nan" invalid_coordinates "${prefix}")
+file(WRITE "${input}" "${invalid_coordinates}ordinary\n")
+execute_process(COMMAND "${LOG2GPX}" INPUT_FILE "${input}"
+                OUTPUT_VARIABLE output ERROR_VARIABLE errors RESULT_VARIABLE result)
+if(result EQUAL 0 OR output MATCHES "<gpx")
+  message(FATAL_ERROR "log2gpx accepted a non-finite coordinate")
+endif()
+
 file(WRITE "${input}" "0,1,2\n")
 execute_process(COMMAND "${LOG2GPX}" INPUT_FILE "${input}"
                 OUTPUT_VARIABLE output ERROR_VARIABLE errors RESULT_VARIABLE result)
