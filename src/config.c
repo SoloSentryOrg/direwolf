@@ -3701,7 +3701,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
             if (lerr != 0) {
 	      char message [300];
 
-              utm_error_string (lerr, message);
+	              utm_error_string (lerr, message, sizeof(message));
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid UTM location: \n%s\n", line, message);
 	      p_tt_config->ttloc_len--;
@@ -3803,7 +3803,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
             if (lerr != 0) {
 
-              mgrs_error_string (lerr, message);
+	              mgrs_error_string (lerr, message, sizeof(message));
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid USNG/MGRS zone & square:  %s\n%s\n", line, tl->mgrs.zone, message);
 	      p_tt_config->ttloc_len--;
@@ -6154,7 +6154,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	    else {
 	      char message [300];
 
-              utm_error_string (lerr, message);
+	              utm_error_string (lerr, message, sizeof(message));
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid UTM location: \n%s\n", line, message);
             }

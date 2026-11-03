@@ -76,7 +76,7 @@ int main (int argc, char *argv[])
 	  }
 	  else {
 
-	    utm_error_string (err, message);
+	    utm_error_string (err, message, sizeof(message));
 	    fprintf (stderr, "Conversion from UTM failed:\n%s\n\n", message);
 
 	  }
@@ -95,7 +95,7 @@ int main (int argc, char *argv[])
 	    printf ("from USNG, latitude = %.6f, longitude = %.6f\n", lat, lon);
 	  }
 	  else {
-	    usng_error_string (err, message);
+	    usng_error_string (err, message, sizeof(message));
 	    fprintf (stderr, "Conversion from USNG failed:\n%s\n\n", message);
 	  }
 
@@ -106,7 +106,7 @@ int main (int argc, char *argv[])
 	    printf ("from MGRS, latitude = %.6f, longitude = %.6f\n", lat, lon);
 	  }
 	  else {
-	    mgrs_error_string (err, message);
+	    mgrs_error_string (err, message, sizeof(message));
 	    fprintf (stderr, "Conversion from MGRS failed:\n%s\n\n", message);
 	  }
 
