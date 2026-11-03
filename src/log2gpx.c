@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "log_csv_record.h"
 
 
 /*
@@ -51,7 +52,6 @@ static int num_things;		/* Number of elements currently in use. */
 
 
 static void read_csv(FILE *fp);
-static void unquote (char *in, char *out);
 static int compar(const void *a, const void *b);
 static void process_things (int first, int last);
 
@@ -156,13 +156,15 @@ int main (int argc, char *argv[])
 
 static void read_csv(FILE *fp)
 {
-	char raw[500];
-	char csv[500];
-	int n;
+	char raw[DW_CSV_RECORD_SIZE];
+	char *fields[DW_CSV_FIELD_COUNT];
+	int read_result;
 
-	while (fgets(raw, sizeof(raw), fp) != NULL) {
-
-	  char *next;
+	while ((read_result = dw_csv_read_record(fp, raw, sizeof(raw))) == 1) {
+	  if (!dw_csv_split_record(raw, fields, DW_CSV_FIELD_COUNT)) {
+	    fprintf(stderr, "Malformed CSV log record.\n");
+	    exit(1);
+	  }
 
 	  char *pchan;
 	  char *putime;
@@ -188,42 +190,28 @@ static void read_csv(FILE *fp)
 	  char *pcomment;
 
 
-	  n = strlen(raw) - 1;
-	  while (n >= 0 && (raw[n] == '\r' || raw[n] == '\n')) {
-	    raw[n] = '\0';
-	    n--;
-	  }
-
-	  unquote (raw, csv);
-	 
-	  //printf ("%s\n", csv);
-
-/*
- * Separate out the fields.
- */	
-    	  next = csv;
-	  pchan = strsep(&next,"\t");
-	  putime = strsep(&next,"\t");
-	  pisotime = strsep(&next,"\t");
-	  psource = strsep(&next,"\t");
-	  pheard = strsep(&next,"\t");
-	  plevel = strsep(&next,"\t");
-	  perror = strsep(&next,"\t");
-	  pdti = strsep(&next,"\t");
-	  pname = strsep(&next,"\t");
-	  psymbol = strsep(&next,"\t");
-	  platitude = strsep(&next,"\t");
-	  plongitude = strsep(&next,"\t");
-	  pspeed = strsep(&next,"\t");		/* Knots, must convert. */
-	  pcourse = strsep(&next,"\t");
-	  paltitude = strsep(&next,"\t");	/* Meters, already correct units. */
-	  pfreq = strsep(&next,"\t");
-	  poffset = strsep(&next,"\t");
-	  ptone = strsep(&next,"\t");
-	  psystem = strsep(&next,"\t");
-	  pstatus = strsep(&next,"\t");
-	  ptelemetry = strsep(&next,"\t");	/* Currently unused.  Add to description? */
-	  pcomment = strsep(&next,"\t");
+	  pchan = fields[0];
+	  putime = fields[1];
+	  pisotime = fields[2];
+	  psource = fields[3];
+	  pheard = fields[4];
+	  plevel = fields[5];
+	  perror = fields[6];
+	  pdti = fields[7];
+	  pname = fields[8];
+	  psymbol = fields[9];
+	  platitude = fields[10];
+	  plongitude = fields[11];
+	  pspeed = fields[12];
+	  pcourse = fields[13];
+	  paltitude = fields[14];
+	  pfreq = fields[15];
+	  poffset = fields[16];
+	  ptone = fields[17];
+	  psystem = fields[18];
+	  pstatus = fields[19];
+	  ptelemetry = fields[20];
+	  pcomment = fields[21];
 
 	  /* Suppress the 'set but not used' warnings. */
 	  /* Alternatively, we might use __attribute__((unused)) */
@@ -331,6 +319,10 @@ static void read_csv(FILE *fp)
 	    num_things++;
 	  }
 	}
+	if (read_result < 0) {
+	  fprintf(stderr, "Invalid or overlong CSV log record.\n");
+	  exit(1);
+	}
 }
 
 
@@ -351,61 +343,6 @@ static int compar(const void *a, const void *b)
 	return (strcmp(ta->time, tb->time)); 
 }
 
-
-/*
- * Take quoting out of CSV data.
- * Replace field separator commas with tabs while retaining 
- * commas that were part of the original data before quoting.
- */
-
-static void unquote (char *in, char *out)
-{
-	char *p;
-	char *q = out;		/* Mind your p's and q's */
-	int quoted = 0;
-
-	for (p=in; *p!='\0'; p++) {
-	  if (*p == '"') {
-	    if (p == in || ( !quoted && *(p-1) == ',')) {
-	      /* " found at beginning of field */
-	      quoted = 1;
-	    }
-	    else if (*(p+1) == '\0' || (quoted && *(p+1) == ',')) {
-	      /* " found at end of field */
-	      quoted = 0;
-	    }
-	    else {
-	      /* " found somewhere in middle of field. */
-	      /* We expect to be in quoted state and we should have a pair. */
-	      if (quoted && *(p+1) == '"') {
-	        /* Keep one and drop the other. */
-	        *q++ = *p;
-		p++;
-	      }
-	      else {
-	        /* This shouldn't happen. */
-	        fprintf (stderr, "CSV data quoting is messed up.\n");
-	        *q++ = *p;
-	      }
-	    }
-	  } 
-	  else if (*p == ',') {
-	    if (quoted) {
-	      /* Comma in original data.  Keep it. */
-	      *q++ = *p;
-	    }
-	    else {
-	      /* Comma is field separator.  Replace with tab. */
-	      *q++ = '\t';
-	    }
-	  }
-	  else {
-	    /* copy ordinary character. */
-	    *q++ = *p;
-	  }
-	}
-	*q = '\0';
-}
 
 /*
  * Prepare text values for XML.
@@ -473,8 +410,10 @@ static void process_things (int first, int last)
 	//printf ("process %d to %d\n", first, last);
 	int i;
 	int moved = 0;
-	char safe_name[30];
-	char safe_comment[120];
+	char safe_name[6 * sizeof(things[0].name) + 1];
+	char safe_comment[6 * sizeof(things[0].comment) + 1];
+	char safe_desc[6 * sizeof(things[0].desc) + 1];
+	char safe_time[6 * sizeof(things[0].time) + 1];
 
 	for (i=first+1; i<=last; i++) {
 	  if (things[i].lat != things[first].lat) moved = 1;
@@ -494,6 +433,8 @@ static void process_things (int first, int last)
 	  printf ("    <trkseg>\n");
 
 	  for (i=first; i<=last; i++) {
+	    xml_text (things[i].desc, safe_desc);
+	    xml_text (things[i].time, safe_time);
 	    printf ("      <trkpt lat=\"%.6f\" lon=\"%.6f\">\n", things[i].lat, things[i].lon);
 	    if (things[i].speed != UNKNOWN_VALUE) {
 	      printf ("        <speed>%.1f</speed>\n", things[i].speed);
@@ -504,13 +445,13 @@ static void process_things (int first, int last)
 	    if (things[i].alt != UNKNOWN_VALUE) {
 	      printf ("        <ele>%.1f</ele>\n", things[i].alt);
 	    }
-	    if (strlen(things[i].desc) > 0) {
-	      printf ("        <desc>%s</desc>\n", things[i].desc);
+	    if (strlen(safe_desc) > 0) {
+	      printf ("        <desc>%s</desc>\n", safe_desc);
 	    }
 	    if (strlen(safe_comment) > 0) {
 	      printf ("        <cmt>%s</cmt>\n", safe_comment);
 	    }
-	    printf ("        <time>%s</time>\n", things[i].time);
+	    printf ("        <time>%s</time>\n", safe_time);
 	    printf ("      </trkpt>\n");
 	  }
 
@@ -528,13 +469,14 @@ static void process_things (int first, int last)
  */
 	xml_text (things[last].name, safe_name);
 	xml_text (things[last].comment, safe_comment);
+	xml_text (things[last].desc, safe_desc);
 
 	printf ("  <wpt lat=\"%.6f\" lon=\"%.6f\">\n", things[last].lat, things[last].lon);
 	if (things[last].alt != UNKNOWN_VALUE) {
 	  printf ("    <ele>%.1f</ele>\n", things[last].alt);
 	}
-	if (strlen(things[i].desc) > 0) {
-	  printf ("    <desc>%s</desc>\n", things[i].desc);
+	if (strlen(safe_desc) > 0) {
+	  printf ("    <desc>%s</desc>\n", safe_desc);
 	}
 	if (strlen(safe_comment) > 0) {
 	  printf ("    <cmt>%s</cmt>\n", safe_comment);

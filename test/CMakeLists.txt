@@ -3,6 +3,14 @@
 
 set(CUSTOM_TEST_BINARY_DIR "${CMAKE_BINARY_DIR}/test")
 
+add_executable(log_csv_record_test log_csv_record_test.c)
+target_include_directories(log_csv_record_test PRIVATE ${CUSTOM_SRC_DIR})
+add_test(log-csv-record "${CUSTOM_TEST_BINARY_DIR}/log_csv_record_test${CMAKE_EXECUTABLE_SUFFIX}")
+add_test(NAME log2gpx-record COMMAND ${CMAKE_COMMAND}
+  -DLOG2GPX=$<TARGET_FILE:log2gpx>
+  -DTEST_DIR=${CUSTOM_TEST_BINARY_DIR}
+  -P "${CMAKE_CURRENT_SOURCE_DIR}/log2gpx_record_test.cmake")
+
 add_executable(speech_runner_test
   speech_runner_test.c
   ${CUSTOM_SRC_DIR}/speech_runner.c

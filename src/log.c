@@ -300,6 +300,8 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 
 	  char itime[24];
 	  char heard[AX25_MAX_ADDR_LEN+1];
+	  char ssource[2 * sizeof(A->g_src) + 1];
+	  char sheard[2 * sizeof(heard) + 1];
 	  int h;
 	  char stemp[256];
 	  char slat[16], slon[16], sspd[12], scse[12], salt[12];
@@ -365,7 +367,9 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	  stemp[0] = A->g_symbol_table;
 	  stemp[1] = A->g_symbol_code;
 	  stemp[2] = '\0';
-	  if (!quote_for_csv (sname, sizeof(sname), name_input, name_capacity) ||
+	  if (!quote_for_csv (ssource, sizeof(ssource), A->g_src, sizeof(A->g_src)) ||
+	      !quote_for_csv (sheard, sizeof(sheard), heard, sizeof(heard)) ||
+	      !quote_for_csv (sname, sizeof(sname), name_input, name_capacity) ||
 	      !quote_for_csv (ssymbol, sizeof(ssymbol), stemp, 3) ||
 	      !quote_for_csv (smfr, sizeof(smfr), A->g_mfr, sizeof(A->g_mfr)) ||
 	      !quote_for_csv (sstatus, sizeof(sstatus), A->g_mic_e_status, sizeof(A->g_mic_e_status)) ||
@@ -389,7 +393,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 
 	  fprintf (g_log_fp, "%d,%d,%s,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", 
 			chan, (int)now, itime, 
-			A->g_src, heard, alevel_text, (int)retries, sdti,
+			ssource, sheard, alevel_text, (int)retries, sdti,
 			sname, ssymbol,
 			slat, slon, sspd, scse, salt, 
 			sfreq, soffs, stone, 
