@@ -7,7 +7,6 @@
 
 #include "direwolf.h"
 
-#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -72,11 +71,15 @@ static int speech_windows_path (const char *program)
   size_t n;
   if (p == NULL) return 0;
   n = strlen(program);
-  if (n < 7 || n >= 80 || !isalpha(p[0]) || p[1] != ':' ||
+  if (n < 7 || n >= 80 ||
+      !((p[0] >= 'A' && p[0] <= 'Z') ||
+        (p[0] >= 'a' && p[0] <= 'z')) || p[1] != ':' ||
       (p[2] != '\\' && p[2] != '/')) return 0;
   for (; *p; ++p) {
-    if (!isalnum(*p) && *p != ' ' && *p != '.' && *p != '_' &&
-        *p != '-' && *p != ':' && *p != '\\' && *p != '/') return 0;
+    if (*p == ':' && p == (const unsigned char *)program + 1) continue;
+    if (!( (*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') ||
+           (*p >= '0' && *p <= '9') || *p == ' ' || *p == '.' ||
+           *p == '_' || *p == '-' || *p == '\\' || *p == '/' )) return 0;
   }
   return _stricmp(program + n - 4, ".exe") == 0 ||
          _stricmp(program + n - 4, ".bat") == 0;
