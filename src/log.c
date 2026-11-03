@@ -50,9 +50,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #if __WIN32__
 #include <direct.h> 	// for _mkdir()
+#include <io.h>
 #endif
 
 #include "ax25_pad.h"
@@ -60,6 +62,13 @@
 #include "decode_aprs.h"
 #include "log.h"
 #include "log_csv.h"
+
+/* Preserve embedded field bytes while retaining each platform's row ending. */
+#if __WIN32__
+#define DW_LOG_CSV_EOL "\r\n"
+#else
+#define DW_LOG_CSV_EOL "\n"
+#endif
 
 
 /*------------------------------------------------------------------
@@ -93,6 +102,43 @@ static int g_daily_names;
 static char g_log_path[80];
 static FILE *g_log_fp;
 static char g_open_fname[20];
+
+/* Create private logs and keep the stream in binary mode so CSV field bytes
+ * are not rewritten by the Windows CRT. Both file-name paths use this gate. */
+static FILE *open_log_append(const char *path)
+{
+	int fd;
+	int open_error;
+	FILE *stream;
+#if __WIN32__
+	fd = _open(path, _O_WRONLY | _O_CREAT | _O_APPEND | _O_BINARY |
+	                 _O_NOINHERIT, _S_IREAD | _S_IWRITE);
+	if (fd < 0) return NULL;
+	stream = _fdopen(fd, "ab");
+	if (stream == NULL) {
+	  open_error = errno;
+	  _close(fd);
+	  errno = open_error;
+	}
+#else
+	int flags = O_WRONLY | O_CREAT | O_APPEND;
+#ifdef O_CLOEXEC
+	flags |= O_CLOEXEC;
+#endif
+#ifdef O_NOFOLLOW
+	flags |= O_NOFOLLOW;
+#endif
+	fd = open(path, flags, S_IRUSR | S_IWUSR);
+	if (fd < 0) return NULL;
+	stream = fdopen(fd, "ab");
+	if (stream == NULL) {
+	  open_error = errno;
+	  close(fd);
+	  errno = open_error;
+	}
+#endif
+	return stream;
+}
 
 
 void log_init (int daily_names, char *path)
@@ -235,7 +281,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	    text_color_set(DW_COLOR_INFO);
 	    dw_printf("Opening log file \"%s\".\n", fname);
 
-	    g_log_fp = fopen (full_path, "a");
+	    g_log_fp = open_log_append(full_path);
 
 	    if (g_log_fp != NULL) {
 	      strlcpy (g_open_fname, fname, sizeof(g_open_fname));
@@ -252,7 +298,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	    // only if this will be the first line.
 	
 	    if ( ! already_there) {
-	      fprintf (g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment\n");
+	      fprintf (g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment" DW_LOG_CSV_EOL);
 	    }
 	  }
 	}
@@ -274,7 +320,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	    text_color_set(DW_COLOR_INFO);
 	    dw_printf("Opening log file \"%s\"\n", g_log_path);
 
-	    g_log_fp = fopen (g_log_path, "a");
+	    g_log_fp = open_log_append(g_log_path);
 
 	    if (g_log_fp == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -288,7 +334,7 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	    // only if this will be the first line.
 
 	    if ( ! already_there) {
-	      fprintf (g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment\n");
+	      fprintf (g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment" DW_LOG_CSV_EOL);
 	    }
 	  }
 	}
@@ -300,6 +346,8 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 
 	  char itime[24];
 	  char heard[AX25_MAX_ADDR_LEN+1];
+	  char ssource[2 * sizeof(A->g_src) + 1];
+	  char sheard[2 * sizeof(heard) + 1];
 	  int h;
 	  char stemp[256];
 	  char slat[16], slon[16], sspd[12], scse[12], salt[12];
@@ -365,7 +413,9 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	  stemp[0] = A->g_symbol_table;
 	  stemp[1] = A->g_symbol_code;
 	  stemp[2] = '\0';
-	  if (!quote_for_csv (sname, sizeof(sname), name_input, name_capacity) ||
+	  if (!quote_for_csv (ssource, sizeof(ssource), A->g_src, sizeof(A->g_src)) ||
+	      !quote_for_csv (sheard, sizeof(sheard), heard, sizeof(heard)) ||
+	      !quote_for_csv (sname, sizeof(sname), name_input, name_capacity) ||
 	      !quote_for_csv (ssymbol, sizeof(ssymbol), stemp, 3) ||
 	      !quote_for_csv (smfr, sizeof(smfr), A->g_mfr, sizeof(A->g_mfr)) ||
 	      !quote_for_csv (sstatus, sizeof(sstatus), A->g_mic_e_status, sizeof(A->g_mic_e_status)) ||
@@ -387,9 +437,9 @@ void log_write (int chan, decode_aprs_t *A, packet_t pp, alevel_t alevel, retry_
 	  strlcpy (stone, "", sizeof(stone));  if (A->g_tone   != G_UNKNOWN) snprintf (stone, sizeof(stone), "%.1f", A->g_tone);
 	                       if (A->g_dcs    != G_UNKNOWN) snprintf (stone, sizeof(stone), "D%03o", A->g_dcs);
 
-	  fprintf (g_log_fp, "%d,%d,%s,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", 
+	  fprintf (g_log_fp, "%d,%d,%s,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s" DW_LOG_CSV_EOL,
 			chan, (int)now, itime, 
-			A->g_src, heard, alevel_text, (int)retries, sdti,
+			ssource, sheard, alevel_text, (int)retries, sdti,
 			sname, ssymbol,
 			slat, slon, sspd, scse, salt, 
 			sfreq, soffs, stone, 
