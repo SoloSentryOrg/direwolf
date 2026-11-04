@@ -27,10 +27,10 @@
 #define remove_directory(p) rmdir(p)
 #endif
 
-static void check_private(FILE *stream)
+static void check_private_fd(int fd)
 {
 #if __WIN32__
-  HANDLE handle = (HANDLE)_get_osfhandle(_fileno(stream));
+  HANDLE handle = (HANDLE)_get_osfhandle(fd);
   PACL acl = NULL;
   PSECURITY_DESCRIPTOR descriptor = NULL;
   SECURITY_DESCRIPTOR_CONTROL control;
@@ -55,15 +55,15 @@ static void check_private(FILE *stream)
   LocalFree(descriptor);
 #else
   struct stat status;
-  assert(fstat(fileno(stream), &status) == 0 && S_ISREG(status.st_mode));
+  assert(fstat(fd, &status) == 0 && S_ISREG(status.st_mode));
   assert((status.st_mode & 0777) == 0600);
-  assert(fcntl(fileno(stream), F_GETFD) & FD_CLOEXEC);
+  assert(fcntl(fd, F_GETFD) & FD_CLOEXEC);
 #if defined(__APPLE__)
   {
     acl_t acl;
     acl_entry_t entry;
     errno = 0;
-    acl = acl_get_fd(fileno(stream));
+    acl = acl_get_fd(fd);
     if (acl == NULL) assert(errno == ENOENT);
     else {
       assert(acl_valid(acl) == 0);
@@ -74,6 +74,31 @@ static void check_private(FILE *stream)
 #endif
 #endif
 }
+
+static void check_private(FILE *stream)
+{
+#if __WIN32__
+  check_private_fd(_fileno(stream));
+#else
+  check_private_fd(fileno(stream));
+#endif
+}
+
+#if defined(__APPLE__) && defined(DW_OUTPUT_CREATION_TEST)
+static unsigned int creation_checks;
+int dw_test_new_open(const char *path, int flags, mode_t mode)
+{
+  int fd = open(path, flags, mode);
+  if (fd >= 0) { check_private_fd(fd); ++creation_checks; }
+  return fd;
+}
+int dw_test_new_openx(const char *path, int flags, filesec_t security)
+{
+  int fd = openx_np(path, flags, security);
+  if (fd >= 0) { check_private_fd(fd); ++creation_checks; }
+  return fd;
+}
+#endif
 
 static void check_bytes(const char *path, const unsigned char *expected, size_t length)
 {
@@ -166,6 +191,9 @@ int main(void)
   assert(dw_open_output(binary, (dw_output_format_t)99, DW_OUTPUT_REPLACE) == NULL);
   assert(dw_open_output(binary, DW_OUTPUT_BINARY, (dw_output_policy_t)99) == NULL);
   assert(remove(binary) == 0 && remove(text) == 0 && remove_directory(directory) == 0);
+#if defined(__APPLE__) && defined(DW_OUTPUT_CREATION_TEST)
+  assert(creation_checks == 2);
+#endif
   puts("private output permissions, bytes, collision and object checks passed");
   return 0;
 }

@@ -14,6 +14,19 @@
 #include <unistd.h>
 #endif
 
+#if defined(__APPLE__) && defined(DW_OUTPUT_CREATION_TEST)
+/* Test observers run immediately after the real creation API returns. */
+extern int dw_test_new_open(const char *, int, mode_t);
+extern int dw_test_new_openx(const char *, int, filesec_t);
+#define DW_NEW_OPEN dw_test_new_open
+#define DW_NEW_OPENX dw_test_new_openx
+#else
+#define DW_NEW_OPEN open
+#if defined(__APPLE__)
+#define DW_NEW_OPENX openx_np
+#endif
+#endif
+
 #if __WIN32__
 /* Explicit DACLs, rather than CRT mode bits, protect newly created Windows
  * files. These APIs retain the application's Windows XP baseline. */
@@ -95,19 +108,38 @@ validate_file:
 #endif
 
 #if defined(__APPLE__)
-static int restrict_new_mac_acl(int fd)
+static int create_new_mac_output(const char *path, int flags)
 {
-  acl_t empty = acl_init(0), actual;
-  acl_entry_t entry;
-  acl_flagset_t flags;
-  int error;
-  if (empty == NULL) return -1;
-  if (acl_get_flagset_np(empty, &flags) != 0 ||
-      acl_add_flag_np(flags, ACL_FLAG_NO_INHERIT) != 0 || acl_set_fd(fd, empty) != 0) {
-    error = errno; acl_free(empty); errno = error;
+  filesec_t security = filesec_init();
+  acl_t empty;
+  acl_flagset_t acl_flags;
+  mode_t mode = S_IRUSR | S_IWUSR;
+  int fd = -1, error;
+  if (security == NULL) return -1;
+  empty = acl_init(0);
+  if (empty == NULL) {
+    error = errno; filesec_free(security); errno = error;
     return -1;
   }
+  if (acl_get_flagset_np(empty, &acl_flags) == 0 &&
+      acl_add_flag_np(acl_flags, ACL_FLAG_NO_INHERIT) == 0 &&
+      filesec_set_property(security, FILESEC_MODE, &mode) == 0 &&
+      filesec_set_property(security, FILESEC_ACL, &empty) == 0) {
+    /* ACL and mode are passed to the kernel with creation. No public interval
+     * exists in which an inherited allow ACE can grant a retained read handle. */
+    fd = DW_NEW_OPENX(path, flags, security);
+  }
+  error = errno;
   acl_free(empty);
+  filesec_free(security);
+  errno = error;
+  return fd;
+}
+
+static int validate_new_mac_acl(int fd)
+{
+  acl_t actual;
+  acl_entry_t entry;
   errno = 0;
   actual = acl_get_fd(fd);
   if (actual == NULL) return errno == ENOENT ? 0 : -1;
@@ -152,7 +184,11 @@ FILE *dw_open_output(const char *path, dw_output_format_t format, dw_output_poli
 #ifdef O_CLOEXEC
   flags |= O_CLOEXEC;
 #endif
-  fd = open(path, flags | O_EXCL, S_IRUSR | S_IWUSR);
+#if defined(__APPLE__)
+  fd = create_new_mac_output(path, flags | O_EXCL);
+#else
+  fd = DW_NEW_OPEN(path, flags | O_EXCL, S_IRUSR | S_IWUSR);
+#endif
   if (fd < 0 && errno == EEXIST && policy == DW_OUTPUT_REPLACE) {
     created = 0;
     fd = open(path, flags & ~O_CREAT);
@@ -171,7 +207,7 @@ FILE *dw_open_output(const char *path, dw_output_format_t format, dw_output_poli
     return NULL;
   }
 #if defined(__APPLE__)
-  if (created && restrict_new_mac_acl(fd) != 0) {
+  if (created && validate_new_mac_acl(fd) != 0) {
     saved = errno; close(fd); errno = saved;
     return NULL;
   }
