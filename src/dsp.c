@@ -35,6 +35,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
+#include <float.h>
 
 #include "audio.h"
 #include "fsk_demod_state.h"
@@ -204,12 +205,12 @@ void gen_lowpass (float fc, float *lp_filter, int filter_size, bp_window_t wtype
  *----------------------------------------------------------------*/
 
 
-void gen_bandpass (float f1, float f2, float *bp_filter, int filter_size, bp_window_t wtype)
+int gen_bandpass (float f1, float f2, float *bp_filter, int filter_size, bp_window_t wtype)
 {
 	int j;
-	float w;
-	float G;
-	float center = 0.5 * (filter_size - 1);
+	double w;
+	double G;
+	float center;
 
 #if DEBUG1
 	text_color_set(DW_COLOR_DEBUG);
@@ -218,14 +219,18 @@ void gen_bandpass (float f1, float f2, float *bp_filter, int filter_size, bp_win
 	dw_printf ("   j     shape   sinc   final\n");
 #endif
 
-	assert (filter_size >= 3 && filter_size <= MAX_FILTER_SIZE);
+	/* Configuration/tuning errors must not produce a kernel containing NaN
+	 * or infinity, even in builds without assertions. */
+	if (bp_filter == NULL || !isfinite(f1) || !isfinite(f2) || f1 >= f2 ||
+	    filter_size < 3 || filter_size > MAX_FILTER_SIZE) return -1;
+        center = 0.5f * (filter_size - 1);
 
         for (j=0; j<filter_size; j++) {
-	  float sinc;
+	  double sinc;
 	  float shape;
 
 	  if (j - center == 0) {
-	    sinc = 2 * (f2 - f1);
+	    sinc = 2.0 * ((double)f2 - f1);
 	  }
 	  else {
 	    sinc = sin(2 * M_PI * f2 * (j-center)) / (M_PI*(j-center))
@@ -233,7 +238,9 @@ void gen_bandpass (float f1, float f2, float *bp_filter, int filter_size, bp_win
 	  }
 
 	  shape = window (wtype, filter_size, j);
-	  bp_filter[j] = sinc * shape;
+	  double coefficient = sinc * shape;
+	  if (!isfinite(coefficient) || fabs(coefficient) > FLT_MAX) return -1;
+	  bp_filter[j] = (float)coefficient;
 
 #if DEBUG1
 	  dw_printf ("%6d  %6.2f  %6.3f  %6.3f\n", j, shape, sinc, bp_filter[j] ) ;
@@ -247,18 +254,22 @@ void gen_bandpass (float f1, float f2, float *bp_filter, int filter_size, bp_win
  * Instead compute gain in middle of passband.
  * See http://dsp.stackexchange.com/questions/4693/fir-filter-gain
  */
-	w = 2 * M_PI * (f1 + f2) / 2;
+	w = M_PI * ((double)f1 + f2);
 	G = 0;
         for (j=0; j<filter_size; j++) {
-	  G += 2 * bp_filter[j] * cos((j-center)*w);  // is this correct?
+	  G += 2.0 * bp_filter[j] * cos((j-center)*w);
 	}
 
 #if DEBUG1
 	dw_printf ("Before normalizing, G=%.3f\n", G);
 #endif
+        if (!isfinite(G) || G == 0.0) return -1;
         for (j=0; j<filter_size; j++) {
-	  bp_filter[j] = bp_filter[j] / G;
-	}
+          double coefficient = bp_filter[j] / G;
+          if (!isfinite(coefficient) || fabs(coefficient) > FLT_MAX) return -1;
+          bp_filter[j] = (float)coefficient;
+        }
+        return 0;
 
 } /* end gen_bandpass */
 

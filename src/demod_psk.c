@@ -531,7 +531,11 @@ void demod_psk_init (enum modem_t modem_type, enum v26_e v26_alt, int samples_pe
 	  f1 = f1 / (float)samples_per_sec;
 	  f2 = f2 / (float)samples_per_sec;
 	  
-	  gen_bandpass (f1, f2, D->u.psk.pre_filter, D->u.psk.pre_filter_taps, D->u.psk.pre_window);
+	  if (gen_bandpass (f1, f2, D->u.psk.pre_filter, D->u.psk.pre_filter_taps, D->u.psk.pre_window) != 0) {
+            text_color_set(DW_COLOR_ERROR);
+            dw_printf("Invalid bandpass filter configuration or tuning; initialization stopped.\n");
+            exit(EXIT_FAILURE);
+          }
 	}
 
 /*
