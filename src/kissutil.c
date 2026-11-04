@@ -62,6 +62,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
+#include "private_output.h"
 #include "ax25_pad.h"
 #include "textcolor.h"
 #include "serial_port.h"
@@ -834,10 +835,14 @@ void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct 
 
 	        text_color_set(DW_COLOR_DEBUG);
 	        dw_printf ("Save received frame to %s\n", path);
-	        fp = fopen (path, "w");
+	        fp = dw_open_output(path, DW_OUTPUT_TEXT, DW_OUTPUT_NEW);
 	        if (fp != NULL) {
-	          fprintf (fp, "%s %s%s\n", prefix, addrs, pinfo);
-	          fclose (fp);
+	          int write_failed = fprintf(fp, "%s %s%s\n", prefix, addrs, pinfo) < 0;
+	          if (fclose(fp) != 0) write_failed = 1;
+	          if (write_failed) {
+	            text_color_set(DW_COLOR_ERROR);
+	            dw_printf("Unable to finish received-frame file: %s\n", path);
+	          }
 	        }
 	        else {
 	          text_color_set(DW_COLOR_ERROR);
