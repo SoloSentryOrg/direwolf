@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #if defined(__APPLE__)
 #include <sys/acl.h>
@@ -14,12 +16,14 @@
 #include <unistd.h>
 #endif
 
-#if defined(__APPLE__) && defined(DW_OUTPUT_CREATION_TEST)
+#if !__WIN32__ && defined(DW_OUTPUT_CREATION_TEST)
 /* Test observers run immediately after the real creation API returns. */
 extern int dw_test_new_open(const char *, int, mode_t);
-extern int dw_test_new_openx(const char *, int, filesec_t);
 #define DW_NEW_OPEN dw_test_new_open
+#if defined(__APPLE__)
+extern int dw_test_new_openx(const char *, int, filesec_t);
 #define DW_NEW_OPENX dw_test_new_openx
+#endif
 #else
 #define DW_NEW_OPEN open
 #if defined(__APPLE__)
@@ -41,6 +45,19 @@ static int open_windows_output(const char *path, int binary, int exclusive)
   char absolute[MAX_PATH], volume[MAX_PATH];
   DWORD needed, serial, flags, length;
   int fd, saved, created = 0;
+  /* NTFS streams share the base file descriptor; a per-stream creation DACL
+   * cannot make an existing public file private. Allow only a drive colon. */
+  {
+    size_t i;
+    for (i = 0; path[i]; ++i) {
+      if (path[i] == ':' && !(i == 1 &&
+          ((path[0] >= 'A' && path[0] <= 'Z') ||
+           (path[0] >= 'a' && path[0] <= 'z')))) {
+        errno = EINVAL;
+        return -1;
+      }
+    }
+  }
   if (!exclusive) {
     file = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
                        NULL, OPEN_EXISTING,
@@ -136,6 +153,34 @@ static int create_new_mac_output(const char *path, int flags)
   return fd;
 }
 
+static int create_private_mac_directory(const char *path)
+{
+  filesec_t security = filesec_init();
+  acl_t empty;
+  acl_flagset_t acl_flags;
+  mode_t mode = S_IRWXU;
+  int fd = -1, error;
+  if (security == NULL) return -1;
+  empty = acl_init(0);
+  if (empty == NULL) {
+    error = errno; filesec_free(security); errno = error;
+    return -1;
+  }
+  if (acl_get_flagset_np(empty, &acl_flags) == 0 &&
+      acl_add_flag_np(acl_flags, ACL_FLAG_NO_INHERIT) == 0 &&
+      filesec_set_property(security, FILESEC_MODE, &mode) == 0 &&
+      filesec_set_property(security, FILESEC_ACL, &empty) == 0) {
+    /* ACL and mode are passed to the kernel with creation. No public interval
+     * exists in which an inherited allow ACE can grant a retained read handle. */
+    fd = mkdirx_np(path, security);
+  }
+  error = errno;
+  acl_free(empty);
+  filesec_free(security);
+  errno = error;
+  return fd;
+}
+
 static int validate_new_mac_acl(int fd)
 {
   acl_t actual;
@@ -173,52 +218,99 @@ FILE *dw_open_output(const char *path, dw_output_format_t format, dw_output_poli
   stream = _fdopen(fd, format == DW_OUTPUT_BINARY ? "wb" : "w");
   if (stream == NULL) { saved = errno; _close(fd); errno = saved; }
 #else
-  struct stat status;
-  int created = 1;
+  struct stat status, directory_status;
+  int created = 0, directory_fd = -1;
+  char *stage = NULL, *child = NULL;
 #ifndef O_NOFOLLOW
-  /* Do not silently fall back to following links on unsupported platforms. */
   errno = ENOTSUP;
   return NULL;
 #else
-  int flags = O_WRONLY | O_CREAT | O_NOFOLLOW | O_NONBLOCK;
+  int flags = O_WRONLY | O_NOFOLLOW | O_NONBLOCK;
 #ifdef O_CLOEXEC
   flags |= O_CLOEXEC;
 #endif
+  fd = -1;
+  if (policy == DW_OUTPUT_REPLACE) {
+    fd = open(path, flags);
+    if (fd < 0 && errno != ENOENT) return NULL;
+  }
+  if (fd < 0) {
+    const char *slash = strrchr(path, '/');
+    size_t parent_length = slash ? (size_t)(slash - path + 1) : 0;
+    size_t length = strlen(path);
+    unsigned int attempt;
+    if (length == 0 || length > 4096) { errno = EINVAL; return NULL; }
+    stage = malloc(parent_length + 64);
+    child = malloc(parent_length + 80);
+    if (stage == NULL || child == NULL) goto failed;
+    memcpy(stage, path, parent_length);
 #if defined(__APPLE__)
-  fd = create_new_mac_output(path, flags | O_EXCL);
+    for (attempt = 0; attempt < 32; ++attempt) {
+      snprintf(stage + parent_length, 64, ".dw-output-%08x%08x",
+               arc4random(), arc4random());
+      if (create_private_mac_directory(stage) == 0) break;
+      if (errno != EEXIST) goto failed;
+    }
+    if (attempt == 32) { errno = EEXIST; goto failed; }
 #else
-  fd = DW_NEW_OPEN(path, flags | O_EXCL, S_IRUSR | S_IWUSR);
+    (void)attempt;
+    strcpy(stage + parent_length, ".dw-output-XXXXXX");
+    if (mkdtemp(stage) == NULL) goto failed;
 #endif
-  if (fd < 0 && errno == EEXIST && policy == DW_OUTPUT_REPLACE) {
-    created = 0;
-    fd = open(path, flags & ~O_CREAT);
+    created = 1;
+    directory_fd = open(stage, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    if (directory_fd < 0) goto failed;
+    if (fstat(directory_fd, &directory_status) != 0) goto failed;
+    if (!S_ISDIR(directory_status.st_mode) || directory_status.st_uid != geteuid() ||
+        (directory_status.st_mode & 0077) != 0) { errno = EACCES; goto failed; }
+#if defined(__APPLE__)
+    if (validate_new_mac_acl(directory_fd) != 0) goto failed;
+#endif
+    snprintf(child, parent_length + 80, "%s/output", stage);
+#if defined(__APPLE__)
+    fd = create_new_mac_output(child, flags | O_CREAT | O_EXCL);
+#else
+    fd = DW_NEW_OPEN(child, flags | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+#endif
+    if (fd < 0) goto failed;
   }
-  if (fd < 0) return NULL;
-  if (fstat(fd, &status) != 0) {
-    saved = errno; close(fd); errno = saved;
-    return NULL;
-  }
-  if (!S_ISREG(status.st_mode)) {
-    close(fd); errno = EINVAL;
-    return NULL;
-  }
+  if (fstat(fd, &status) != 0) goto failed;
+  if (!S_ISREG(status.st_mode)) { errno = EINVAL; goto failed; }
   if (created && (status.st_uid != geteuid() || (status.st_mode & 0077) != 0)) {
-    close(fd); errno = EACCES;
-    return NULL;
+    errno = EACCES; goto failed;
   }
 #if defined(__APPLE__)
-  if (created && validate_new_mac_acl(fd) != 0) {
-    saved = errno; close(fd); errno = saved;
-    return NULL;
-  }
+  if (created && validate_new_mac_acl(fd) != 0) goto failed;
 #endif
   if (fcntl(fd, F_SETFD, FD_CLOEXEC) < 0 ||
-      (policy == DW_OUTPUT_REPLACE && ftruncate(fd, 0) != 0)) {
-    saved = errno; close(fd); errno = saved;
-    return NULL;
-  }
+      (!created && ftruncate(fd, 0) != 0)) goto failed;
   stream = fdopen(fd, format == DW_OUTPUT_BINARY ? "wb" : "w");
-  if (stream == NULL) { saved = errno; close(fd); errno = saved; }
+  if (stream == NULL) goto failed;
+  if (created) {
+    /* Publish only a validated descriptor. Never replace or remove a final
+     * destination that appeared concurrently. The parent must be trusted. */
+    if (linkat(directory_fd, "output", AT_FDCWD, path, 0) != 0) {
+      saved = errno; fclose(stream); fd = -1; errno = saved; goto failed;
+    }
+    unlinkat(directory_fd, "output", 0);
+    close(directory_fd);
+    rmdir(stage);
+  }
+  free(child);
+  free(stage);
+  return stream;
+failed:
+  saved = errno;
+  if (fd >= 0) close(fd);
+  if (directory_fd >= 0) {
+    unlinkat(directory_fd, "output", 0);
+    close(directory_fd);
+  }
+  if (created) rmdir(stage);
+  free(child);
+  free(stage);
+  errno = saved;
+  return NULL;
 #endif
 #endif
   return stream;

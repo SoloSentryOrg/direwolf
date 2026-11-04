@@ -84,20 +84,40 @@ static void check_private(FILE *stream)
 #endif
 }
 
-#if defined(__APPLE__) && defined(DW_OUTPUT_CREATION_TEST)
+#if !__WIN32__ && defined(DW_OUTPUT_CREATION_TEST)
 static unsigned int creation_checks;
+static int inject_bad_mode;
+static const char *concurrent_destination;
 int dw_test_new_open(const char *path, int flags, mode_t mode)
 {
   int fd = open(path, flags, mode);
-  if (fd >= 0) { check_private_fd(fd); ++creation_checks; }
+  if (fd >= 0) {
+    if (inject_bad_mode) assert(fchmod(fd, 0666) == 0);
+    else check_private_fd(fd);
+    if (concurrent_destination) {
+      FILE *other = fopen(concurrent_destination, "wb");
+      assert(other && fputs("KEEP", other) >= 0 && fclose(other) == 0);
+    }
+    ++creation_checks;
+  }
   return fd;
 }
+#if defined(__APPLE__)
 int dw_test_new_openx(const char *path, int flags, filesec_t security)
 {
   int fd = openx_np(path, flags, security);
-  if (fd >= 0) { check_private_fd(fd); ++creation_checks; }
+  if (fd >= 0) {
+    if (inject_bad_mode) assert(fchmod(fd, 0666) == 0);
+    else check_private_fd(fd);
+    if (concurrent_destination) {
+      FILE *other = fopen(concurrent_destination, "wb");
+      assert(other && fputs("KEEP", other) >= 0 && fclose(other) == 0);
+    }
+    ++creation_checks;
+  }
   return fd;
 }
+#endif
 #endif
 
 static void check_bytes(const char *path, const unsigned char *expected, size_t length)
@@ -190,9 +210,36 @@ int main(void)
   assert(dw_open_output(directory, DW_OUTPUT_BINARY, DW_OUTPUT_REPLACE) == NULL);
   assert(dw_open_output(binary, (dw_output_format_t)99, DW_OUTPUT_REPLACE) == NULL);
   assert(dw_open_output(binary, DW_OUTPUT_BINARY, (dw_output_policy_t)99) == NULL);
+#if __WIN32__
+  {
+    char alias[160], absolute[MAX_PATH];
+    snprintf(alias, sizeof(alias), "%s:hidden", binary);
+    assert(dw_open_output(alias, DW_OUTPUT_BINARY, DW_OUTPUT_NEW) == NULL);
+    snprintf(alias, sizeof(alias), "%s::$DATA", binary);
+    assert(dw_open_output(alias, DW_OUTPUT_BINARY, DW_OUTPUT_REPLACE) == NULL);
+    check_bytes(binary, (const unsigned char *)"OK", 2);
+    assert(GetFullPathNameA(binary, sizeof(absolute), absolute, NULL) > 0);
+    stream = dw_open_output(absolute, DW_OUTPUT_BINARY, DW_OUTPUT_REPLACE);
+    assert(stream && fclose(stream) == 0);
+  }
+#endif
+#if !__WIN32__ && defined(DW_OUTPUT_CREATION_TEST)
+  inject_bad_mode = 1;
+  assert(dw_open_output(fifo, DW_OUTPUT_BINARY, DW_OUTPUT_REPLACE) == NULL);
+  { struct stat st; assert(lstat(fifo, &st) < 0 && errno == ENOENT); }
+  inject_bad_mode = 0;
+  stream = dw_open_output(fifo, DW_OUTPUT_BINARY, DW_OUTPUT_REPLACE);
+  assert(stream); check_private(stream); assert(fclose(stream) == 0);
+  assert(remove(fifo) == 0);
+  concurrent_destination = fifo;
+  assert(dw_open_output(fifo, DW_OUTPUT_BINARY, DW_OUTPUT_REPLACE) == NULL);
+  concurrent_destination = NULL;
+  check_bytes(fifo, (const unsigned char *)"KEEP", 4);
+  assert(remove(fifo) == 0);
+#endif
   assert(remove(binary) == 0 && remove(text) == 0 && remove_directory(directory) == 0);
-#if defined(__APPLE__) && defined(DW_OUTPUT_CREATION_TEST)
-  assert(creation_checks == 2);
+#if !__WIN32__ && defined(DW_OUTPUT_CREATION_TEST)
+  assert(creation_checks == 6);
 #endif
   puts("private output permissions, bytes, collision and object checks passed");
   return 0;

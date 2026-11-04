@@ -7,7 +7,8 @@ typedef enum { DW_OUTPUT_REPLACE, DW_OUTPUT_NEW } dw_output_policy_t;
 /* New files are owner-private; an explicitly selected existing regular output
  * retains its permissions/ACL. Replacement truncates only after object checks.
  * New-file creation fails closed when the filesystem cannot enforce private
- * permissions (including Windows volumes without persistent ACL support).
+ * permissions or exclusive hard-link publication (including Windows volumes
+ * without persistent ACL support). Windows alternate streams are rejected.
  * The caller owns the returned stream. Parent directories must be trusted. */
 FILE *dw_open_output(const char *path, dw_output_format_t format, dw_output_policy_t policy);
 #endif
