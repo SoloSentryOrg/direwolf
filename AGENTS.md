@@ -61,6 +61,39 @@
   state, required checks or rulesets, and observed status-check names, then
   retain exactly one active CodeQL setup.
 
+## Default-Branch Protection Operations
+
+- As of 4 November 2026, `master` is protected by repository rulesets
+  `26542532` (mandatory security) and `26542536` (pull-request review).
+  Read back live rules and the exact current head before relying on this dated
+  observation. The policy, approved payloads and acceptance record belong to
+  `SoloSentryOrg/github-enterprise-management-solosentry#112`.
+- Mandatory security has no bypass actors. Preserve verified signatures,
+  strict required checks, and deletion/non-fast-forward prohibitions. Do not
+  weaken these controls to repair a failing PR; fix forward on a signed/DCO
+  working branch and verify GitHub's signature result before readiness.
+- The native contexts are `Ubuntu latest Debug`, `macOS latest`,
+  `Ubuntu 22.04`, and `Windows Latest MinGW 64bit`. Language contexts are
+  `Analyze (actions)`, `Analyze (python)`, and `Analyze (c-cpp)`.
+  These seven originate from GitHub Actions App `15368`; aggregate `CodeQL`
+  originates from App `57789`. Check names alone do not prove the expected
+  producer, actual outputs, source coverage or current-head success.
+- Normal merge commits remain the supported method. The PR rule requires
+  resolved conversations without mandatory independent approvals, avoiding a
+  solo-maintainer deadlock. Its organisation-admin bypass is PR-only and is
+  not routine merge authority; using that emergency path requires a separate
+  recorded owner decision for the exact exceptional PR. It cannot bypass the
+  mandatory-security ruleset.
+- Before an ordinary merge, require every applicable exact-head check to
+  succeed without skipped/neutral substitutes; inspect actual analyses and
+  native outputs, complete review summaries and all threads, signing/DCO,
+  authoritative ancestry and effective rules. A bot recommendation is
+  supplemental evidence, not a human approval or operational acceptance.
+- Protection, required-context or scanner-owner changes require the central
+  governance process and current evidence. Do not silently recreate rules,
+  add a linear-history contradiction, expand credentials, bypass a failed
+  gate or infer that a saved setting completes governance acceptance.
+
 ## Sub-Agent Use
 
 - Sub-agents are allowed when they provide clear benefit, such as focused
