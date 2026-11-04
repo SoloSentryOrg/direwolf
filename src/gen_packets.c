@@ -77,6 +77,7 @@
 #include <assert.h>
 #include <math.h>
 
+#include "private_output.h"
 #include "audio.h"
 #include "ax25_pad.h"
 #include "hdlc_send.h"
@@ -945,7 +946,7 @@ static int audio_file_open (char *fname, struct audio_s *pa)
 /*
  * Write the file header.  Don't know length yet.
  */
-        out_fp = fopen (fname, "wb");	
+        out_fp = dw_open_output(fname, DW_OUTPUT_BINARY, DW_OUTPUT_REPLACE);
 	
         if (out_fp == NULL) {
            text_color_set(DW_COLOR_ERROR); dw_printf ("Couldn't open file for write: %s\n", fname);

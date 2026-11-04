@@ -3,6 +3,14 @@
 
 set(CUSTOM_TEST_BINARY_DIR "${CMAKE_BINARY_DIR}/test")
 
+add_executable(private_output_test private_output_test.c ${CUSTOM_SRC_DIR}/private_output.c)
+target_include_directories(private_output_test PRIVATE ${CUSTOM_SRC_DIR})
+if(WIN32 OR CYGWIN)
+  target_link_libraries(private_output_test advapi32)
+endif()
+add_test(NAME private-output COMMAND private_output_test)
+set_tests_properties(private-output PROPERTIES TIMEOUT 15)
+
 add_executable(log_csv_record_test log_csv_record_test.c)
 target_include_directories(log_csv_record_test PRIVATE ${CUSTOM_SRC_DIR})
 add_test(log-csv-record "${CUSTOM_TEST_BINARY_DIR}/log_csv_record_test${CMAKE_EXECUTABLE_SUFFIX}")

@@ -309,6 +309,7 @@ target_link_libraries(log2gpx
 # gen_packets
 list(APPEND gen_packets_SOURCES
   gen_packets.c
+  private_output.c
   ax25_pad.c
   ax25_pad2.c
   fx25_encode.c
@@ -338,6 +339,10 @@ target_link_libraries(gen_packets
   ${MISC_LIBRARIES}
   )
 
+
+if(WIN32 OR CYGWIN)
+  target_link_libraries(gen_packets advapi32)
+endif()
 
 # Unit test for AFSK demodulator
 # atest
@@ -432,6 +437,7 @@ endif()
 # kissutil
 list(APPEND kissutil_SOURCES
   kissutil.c
+  private_output.c
   kiss_frame.c
   ax25_pad.c
   fcs_calc.c
@@ -455,7 +461,7 @@ target_link_libraries(kissutil
   )
 
 if(WIN32 OR CYGWIN)
-  target_link_libraries(kissutil ws2_32)
+  target_link_libraries(kissutil ws2_32 advapi32)
 endif()
 
 
