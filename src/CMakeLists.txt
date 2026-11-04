@@ -1,3 +1,11 @@
+# Numeric validation must retain NaN/Inf semantics in every target using these
+# sources. Source flags follow global -ffast-math; retain CMake 3.10 support.
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+  set_property(SOURCE dsp.c APPEND_STRING PROPERTY COMPILE_FLAGS " -fno-fast-math -fno-finite-math-only")
+elseif(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+  set_property(SOURCE dsp.c APPEND_STRING PROPERTY COMPILE_FLAGS " /fp:strict")
+endif()
+
 
 # global includes
 # not ideal but not so slow

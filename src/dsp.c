@@ -26,6 +26,12 @@
  *
  *----------------------------------------------------------------*/
 
+/* Finite-value checks are a security boundary, not an optimizer hint. */
+#if defined(__FAST_MATH__) || defined(_M_FP_FAST) || \
+    (defined(__FINITE_MATH_ONLY__) && __FINITE_MATH_ONLY__ > 0)
+#error Bandpass validation requires strict floating-point semantics.
+#endif
+
 #include "direwolf.h"
 
 #include <stdlib.h>

@@ -1,4 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
+#if defined(__FAST_MATH__) || defined(_M_FP_FAST) || \
+    (defined(__FINITE_MATH_ONLY__) && __FINITE_MATH_ONLY__ > 0)
+#error Bandpass validation tests require strict floating-point semantics.
+#endif
 #include "direwolf.h"
 #include "audio.h"
 #include "fsk_demod_state.h"
