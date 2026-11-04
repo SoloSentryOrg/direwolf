@@ -14,6 +14,18 @@ endif()
 add_test(NAME private-output COMMAND private_output_test)
 set_tests_properties(private-output PROPERTIES TIMEOUT 15)
 
+add_executable(dsp_bandpass_test dsp_bandpass_test.c ${CUSTOM_SRC_DIR}/dsp.c)
+target_include_directories(dsp_bandpass_test PRIVATE ${CUSTOM_SRC_DIR})
+target_link_libraries(dsp_bandpass_test ${MISC_LIBRARIES})
+add_test(NAME dsp-bandpass COMMAND dsp_bandpass_test)
+set_tests_properties(dsp-bandpass PROPERTIES TIMEOUT 15)
+add_test(NAME dsp-bandpass-initialization COMMAND ${CMAKE_COMMAND}
+  -DGEN_PACKETS=$<TARGET_FILE:gen_packets>
+  -DATEST=$<TARGET_FILE:atest>
+  -DTEST_DIR=${CUSTOM_TEST_BINARY_DIR}/bandpass-initialization
+  -P "${CMAKE_CURRENT_SOURCE_DIR}/dsp_bandpass_initialization_test.cmake")
+set_tests_properties(dsp-bandpass-initialization PROPERTIES TIMEOUT 120)
+
 add_executable(log_csv_record_test log_csv_record_test.c)
 target_include_directories(log_csv_record_test PRIVATE ${CUSTOM_SRC_DIR})
 add_test(log-csv-record "${CUSTOM_TEST_BINARY_DIR}/log_csv_record_test${CMAKE_EXECUTABLE_SUFFIX}")

@@ -456,7 +456,11 @@ void demod_afsk_init (int samples_per_sec, int baud, int mark_freq,
 	  f1 = f1 / (float)samples_per_sec;
 	  f2 = f2 / (float)samples_per_sec;
 	  
-	  gen_bandpass (f1, f2, D->pre_filter, D->pre_filter_taps, D->pre_window);
+	  if (gen_bandpass (f1, f2, D->pre_filter, D->pre_filter_taps, D->pre_window) != 0) {
+            text_color_set(DW_COLOR_ERROR);
+            dw_printf("Invalid bandpass filter configuration or tuning; initialization stopped.\n");
+            exit(EXIT_FAILURE);
+          }
 	}
 
 /*
